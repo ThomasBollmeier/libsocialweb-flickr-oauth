@@ -214,8 +214,10 @@ _check_access_token_cb (RestProxyCall *call,
     RestXmlNode *username = rest_xml_node_find (root, "username");
 
     if (username != NULL) {
+      const gchar *host = g_getenv ("SW_LOCAL_VIMEO");
       priv->username = g_strdup (username->content);
-      rest_proxy_bind (priv->simple_proxy, priv->username);
+      rest_proxy_bind (priv->simple_proxy, host ? host : "vimeo.com",
+                       priv->username);
     }
 
     rest_xml_node_unref (root);
@@ -293,6 +295,14 @@ got_tokens_cb (RestProxy *proxy, gboolean got_tokens, gpointer user_data)
   if (got_tokens) {
     RestProxyCall *call;
     OAuthProxy *upload_proxy = OAUTH_PROXY (priv->proxy);
+    const gchar *host = g_getenv ("SW_LOCAL_VIMEO");
+
+    /* For local testing with a mock Vimeo service. */
+    if (host != NULL) {
+      gchar *url = g_strdup_printf ("http://%s/", host);
+      g_object_set (priv->proxy, "url-format", url, NULL);
+      g_free (url);
+    }
 
     oauth_proxy_set_token (OAUTH_PROXY (priv->upload_proxy),
                            oauth_proxy_get_token (upload_proxy));
