@@ -39,18 +39,24 @@
 #include <rest/rest-xml-parser.h>
 
 #include <interfaces/sw-query-ginterface.h>
+#include <interfaces/sw-collections-ginterface.h>
 
 #include "vimeo.h"
 #include "vimeo-item-view.h"
 
 static void initable_iface_init (gpointer g_iface, gpointer iface_data);
 static void query_iface_init (gpointer g_iface, gpointer iface_data);
+static void collections_iface_init (gpointer g_iface, gpointer iface_data);
 
 G_DEFINE_TYPE_WITH_CODE (SwServiceVimeo, sw_service_vimeo, SW_TYPE_SERVICE,
                          G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE, initable_iface_init)
+                         G_IMPLEMENT_INTERFACE (SW_TYPE_COLLECTIONS_IFACE,
+                                                collections_iface_init)
                          G_IMPLEMENT_INTERFACE (SW_TYPE_QUERY_IFACE, query_iface_init));
 #define GET_PRIVATE(o) \
   (G_TYPE_INSTANCE_GET_PRIVATE ((o), SW_TYPE_SERVICE_VIMEO, SwServiceVimeoPrivate))
+
+#define ALBUM_PREFIX "vimeo-"
 
 struct _SwServiceVimeoPrivate {
   RestProxy *proxy;
@@ -68,12 +74,19 @@ get_name (SwService *service)
   return "vimeo";
 }
 
+enum {
+  COLLECTION = 1,
+  PHOTO = 2,
+  VIDEO = 4
+} typedef MediaType;
+
 static const char **
 get_static_caps (SwService *service)
 {
   static const char * caps[] = {
     HAS_QUERY_IFACE,
     HAS_BANISHABLE_IFACE,
+    HAS_COLLECTIONS_IFACE,
 
     NULL
   };
@@ -131,17 +144,8 @@ node_from_call (RestProxyCall *call, GError **error)
                                           rest_proxy_call_get_payload (call),
                                           rest_proxy_call_get_payload_length (call));
 
-  /* Invalid XML, or incorrect root */
-  if (node == NULL || !g_str_equal (node->name, "rsp")) {
-    g_set_error (error, SW_SERVICE_ERROR, SW_SERVICE_ERROR_REMOTE_ERROR,
-                 "malformed remote response: %s",
-                 rest_proxy_call_get_payload (call));
-    if (node)
-      rest_xml_node_unref (node);
-    return NULL;
-  }
-
-  if (g_strcmp0 (rest_xml_node_get_attr (node, "stat"), "ok") != 0) {
+  if (node == NULL || (g_str_equal (node->name, "rsp") &&
+                       g_strcmp0 (rest_xml_node_get_attr (node, "stat"), "ok") != 0)) {
     RestXmlNode *err;
     err = rest_xml_node_find (node, "err");
     g_set_error (error, SW_SERVICE_ERROR, SW_SERVICE_ERROR_REMOTE_ERROR,
@@ -174,13 +178,31 @@ _check_access_token_cb (RestProxyCall *call,
     g_error_free (err);
   } else {
     RestXmlNode *username = rest_xml_node_find (root, "username");
-    priv->username = g_strdup (username->content);
-    rest_proxy_bind (priv->simple_proxy, priv->username);
+
+    if (username != NULL) {
+      priv->username = g_strdup (username->content);
+      rest_proxy_bind (priv->simple_proxy, priv->username);
+    }
 
     rest_xml_node_unref (root);
   }
 
   sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
+}
+
+static const gchar *
+get_child_contents (RestXmlNode *root,
+                   const gchar *element_name)
+{
+  RestXmlNode *node = rest_xml_node_find (root, element_name);
+
+  g_return_val_if_fail (root != NULL, NULL);
+
+  node = rest_xml_node_find (root, element_name);
+  if (node == NULL)
+    return NULL;
+
+  return node->content;
 }
 
 static void
@@ -332,6 +354,153 @@ _vimeo_query_open_view (SwQueryIface          *self,
   object_path = sw_item_view_get_object_path (item_view);
   sw_query_iface_return_from_open_view (context,
                                         object_path);
+}
+
+/* Collections Interface */
+
+static GValueArray *
+_extract_collection_details_from_xml (RestXmlNode *album)
+{
+  GValueArray *value_array;
+  GHashTable *attribs = g_hash_table_new (g_str_hash, g_str_equal);
+  GValue *value = NULL;
+  gint64 count = 0;
+
+  value_array = g_value_array_new (5);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 0);
+  g_value_init (value, G_TYPE_STRING);
+  g_value_take_string (value,
+                       g_strdup_printf ("%s%s",
+                                        ALBUM_PREFIX,
+                                        get_child_contents (album, "id")));
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 1);
+  g_value_init (value, G_TYPE_STRING);
+  g_value_set_static_string (value, get_child_contents (album, "title"));
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 2);
+  g_value_init (value, G_TYPE_STRING);
+  g_value_set_static_string (value, "");
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 3);
+  g_value_init (value, G_TYPE_UINT);
+  g_value_set_uint (value, VIDEO);
+
+  count = g_ascii_strtoll (get_child_contents (album, "total_videos"), NULL,
+                           10);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 4);
+  g_value_init (value, G_TYPE_INT);
+  g_value_set_int (value, count);
+
+  g_hash_table_insert (attribs, "description",
+                       (gpointer) get_child_contents (album, "description"));
+  g_hash_table_insert (attribs, "url",
+                       (gpointer)get_child_contents (album, "url"));
+  g_hash_table_insert (attribs, "x-vimeo-created-on",
+                       (gpointer) get_child_contents (album, "created_on"));
+  g_hash_table_insert (attribs, "x-vimeo-last-modified",
+                       (gpointer) get_child_contents (album, "last_modified"));
+  g_hash_table_insert (attribs, "x-vimeo-thumbnail-small",
+                       (gpointer) get_child_contents (album,
+                                                      "thumbnail_small"));
+  g_hash_table_insert (attribs, "x-vimeo-thumbnail-medium",
+                       (gpointer) get_child_contents (album,
+                                                      "thumbnail_medium"));
+  g_hash_table_insert (attribs, "x-vimeo-thumbnail-large",
+                       (gpointer) get_child_contents (album,
+                                                      "thumbnail_large"));
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 5);
+  g_value_init (value, dbus_g_type_get_map ("GHashTable",
+          G_TYPE_STRING,
+          G_TYPE_STRING));
+  g_value_take_boxed (value, attribs);
+
+  return value_array;
+}
+
+static void
+_list_albums_cb (RestProxyCall *call,
+                 const GError  *error,
+                 GObject       *weak_object,
+                 gpointer       user_data)
+{
+  DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+  RestXmlNode *root = NULL;
+  RestXmlNode *album;
+  GPtrArray *rv = NULL;
+  GError *err = NULL;
+
+  if (error != NULL)
+    err = g_error_new (SW_SERVICE_ERROR, SW_SERVICE_ERROR_REMOTE_ERROR,
+                       "rest call failed: %s", error->message);
+
+  if (err == NULL)
+    root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    dbus_g_method_return_error (context, err);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  rv = g_ptr_array_new_with_free_func ((GDestroyNotify )g_value_array_free);
+
+  album = rest_xml_node_find (root, "album");
+
+  while (album != NULL) {
+    g_ptr_array_add (rv, _extract_collection_details_from_xml (album));
+    album = album->next;
+  }
+
+  sw_collections_iface_return_from_get_list (context, rv);
+
+ OUT:
+  if (rv != NULL)
+    g_ptr_array_free (rv, TRUE);
+
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_vimeo_collections_get_list (SwCollectionsIface *self,
+                             DBusGMethodInvocation *context)
+{
+  SwServiceVimeo *vimeo = SW_SERVICE_VIMEO (self);
+  SwServiceVimeoPrivate *priv = vimeo->priv;
+  RestProxyCall *call;
+
+  g_return_if_fail (priv->simple_proxy != NULL);
+
+  call = rest_proxy_new_call (priv->simple_proxy);
+  rest_proxy_call_set_function (call, "albums.xml");
+
+  rest_proxy_call_async (call,
+                         (RestProxyCallAsyncCallback) _list_albums_cb,
+                         (GObject *) vimeo,
+                         context,
+                         NULL);
+
+  g_object_unref (call);
+}
+
+static void
+collections_iface_init (gpointer g_iface,
+                        gpointer iface_data)
+{
+  SwCollectionsIfaceClass *klass = (SwCollectionsIfaceClass *) g_iface;
+
+  sw_collections_iface_implement_get_list (klass,
+                                           _vimeo_collections_get_list);
 }
 
 static void
