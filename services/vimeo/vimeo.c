@@ -358,6 +358,33 @@ _vimeo_query_open_view (SwQueryIface          *self,
 
 /* Collections Interface */
 
+typedef struct {
+  DBusGMethodInvocation *dbus_context;
+  gchar *album_id;
+  SwServiceVimeo *vimeo;
+} VimeoAlbumOpCtx;
+
+static VimeoAlbumOpCtx *
+album_op_ctx_new (DBusGMethodInvocation *dbus_context,
+                  const gchar *album_id,
+                  SwServiceVimeo *vimeo)
+{
+  VimeoAlbumOpCtx *ctx = g_slice_new0 (VimeoAlbumOpCtx);
+  ctx->dbus_context = dbus_context;
+  ctx->album_id = g_strdup (album_id);
+  ctx->vimeo = vimeo;
+
+  return ctx;
+}
+
+
+static void
+album_op_ctx_free (VimeoAlbumOpCtx *ctx)
+{
+  g_free (ctx->album_id);
+  g_slice_free (VimeoAlbumOpCtx, ctx);
+}
+
 static GValueArray *
 _extract_collection_details_from_xml (RestXmlNode *album)
 {
@@ -472,6 +499,60 @@ _list_albums_cb (RestProxyCall *call,
 }
 
 static void
+_get_album_details_cb (RestProxyCall *call,
+                       const GError  *error,
+                       GObject       *weak_object,
+                       gpointer       user_data)
+{
+  VimeoAlbumOpCtx *ctx = (VimeoAlbumOpCtx *) user_data;
+  RestXmlNode *root = NULL;
+  RestXmlNode *album;
+  GValueArray *collection_details = NULL;
+  GError *err = NULL;
+
+  if (error != NULL)
+    err = g_error_new (SW_SERVICE_ERROR, SW_SERVICE_ERROR_REMOTE_ERROR,
+                       "rest call failed: %s", error->message);
+
+  if (err == NULL)
+    root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    dbus_g_method_return_error (ctx->dbus_context, err);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  album = rest_xml_node_find (root, "album");
+
+  while (album != NULL && collection_details == NULL) {
+    const gchar *album_id = rest_xml_node_find (album, "id")->content;
+    if (g_strcmp0 (album_id, ctx->album_id + strlen(ALBUM_PREFIX)) == 0)
+      collection_details = _extract_collection_details_from_xml (album);
+    album = album->next;
+  }
+
+  if (collection_details == NULL) {
+    err = g_error_new (SW_SERVICE_ERROR, SW_SERVICE_ERROR_REMOTE_ERROR,
+                       "Album id '%s' not found", ctx->album_id);
+    dbus_g_method_return_error (ctx->dbus_context, err);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  sw_collections_iface_return_from_get_details (ctx->dbus_context, collection_details);
+
+ OUT:
+  album_op_ctx_free (ctx);
+
+  if (collection_details != NULL)
+    g_value_array_free (collection_details);
+
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
 _vimeo_collections_get_list (SwCollectionsIface *self,
                              DBusGMethodInvocation *context)
 {
@@ -494,6 +575,32 @@ _vimeo_collections_get_list (SwCollectionsIface *self,
 }
 
 static void
+_vimeo_collections_get_details (SwCollectionsIface *self,
+                                const gchar *collection_id,
+                                DBusGMethodInvocation *context)
+{
+  SwServiceVimeo *vimeo = SW_SERVICE_VIMEO (self);
+  SwServiceVimeoPrivate *priv = vimeo->priv;
+  RestProxyCall *call;
+  VimeoAlbumOpCtx *ctx = NULL;
+
+  g_return_if_fail (priv->simple_proxy != NULL);
+
+  ctx = album_op_ctx_new (context, collection_id, vimeo);
+
+  call = rest_proxy_new_call (priv->simple_proxy);
+  rest_proxy_call_set_function (call, "albums.xml");
+
+  rest_proxy_call_async (call,
+                         (RestProxyCallAsyncCallback) _get_album_details_cb,
+                         (GObject *) vimeo,
+                         ctx,
+                         NULL);
+
+  g_object_unref (call);
+}
+
+static void
 collections_iface_init (gpointer g_iface,
                         gpointer iface_data)
 {
@@ -501,6 +608,9 @@ collections_iface_init (gpointer g_iface,
 
   sw_collections_iface_implement_get_list (klass,
                                            _vimeo_collections_get_list);
+
+  sw_collections_iface_implement_get_details (klass,
+                                              _vimeo_collections_get_details);
 }
 
 static void
