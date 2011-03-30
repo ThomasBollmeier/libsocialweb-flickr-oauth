@@ -40,6 +40,7 @@
 
 #include <interfaces/sw-query-ginterface.h>
 #include <interfaces/sw-collections-ginterface.h>
+#include <interfaces/sw-video-upload-ginterface.h>
 
 #include "vimeo.h"
 #include "vimeo-item-view.h"
@@ -47,12 +48,17 @@
 static void initable_iface_init (gpointer g_iface, gpointer iface_data);
 static void query_iface_init (gpointer g_iface, gpointer iface_data);
 static void collections_iface_init (gpointer g_iface, gpointer iface_data);
+static void video_upload_iface_init (gpointer g_iface, gpointer iface_data);
 
 G_DEFINE_TYPE_WITH_CODE (SwServiceVimeo, sw_service_vimeo, SW_TYPE_SERVICE,
-                         G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE, initable_iface_init)
+                         G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE,
+                                                initable_iface_init)
                          G_IMPLEMENT_INTERFACE (SW_TYPE_COLLECTIONS_IFACE,
                                                 collections_iface_init)
-                         G_IMPLEMENT_INTERFACE (SW_TYPE_QUERY_IFACE, query_iface_init));
+                         G_IMPLEMENT_INTERFACE (SW_TYPE_VIDEO_UPLOAD_IFACE,
+                                                video_upload_iface_init)
+                         G_IMPLEMENT_INTERFACE (SW_TYPE_QUERY_IFACE,
+                                                query_iface_init));
 #define GET_PRIVATE(o) \
   (G_TYPE_INSTANCE_GET_PRIVATE ((o), SW_TYPE_SERVICE_VIMEO, SwServiceVimeoPrivate))
 
@@ -67,6 +73,7 @@ typedef struct {
 struct _SwServiceVimeoPrivate {
   RestProxy *proxy;
   RestProxy *simple_proxy;
+  RestProxy *upload_proxy;
 
   gboolean configured;
   gboolean inited;
@@ -233,6 +240,46 @@ get_child_contents (RestXmlNode *root,
 }
 
 static void
+_simple_rest_async_run (RestProxy *proxy,
+                        const gchar *function,
+                        RestProxyCallAsyncCallback callback,
+                        GObject                      *weak_object,
+                        gpointer                      userdata,
+                        GError                      **error,
+                        ...)
+{
+  va_list params;
+  RestProxyCall *call = rest_proxy_new_call (proxy);
+  rest_proxy_call_set_function (call, function);
+
+  va_start (params, error);
+  rest_proxy_call_add_params_from_valist (call, params);
+  va_end (params);
+
+  rest_proxy_call_async (call,
+                         callback,
+                         weak_object,
+                         userdata,
+                         error);
+
+  g_object_unref (call);
+
+}
+
+static const gchar *
+get_child_attribute (RestXmlNode *root,
+                    const gchar *element_name,
+                    const gchar *attr_name)
+{
+  RestXmlNode *node = rest_xml_node_find (root, element_name);
+
+  if (node == NULL)
+    return NULL;
+
+  return g_hash_table_lookup (node->attrs, attr_name);
+}
+
+static void
 got_tokens_cb (RestProxy *proxy, gboolean got_tokens, gpointer user_data)
 {
   SwServiceVimeo *self = (SwServiceVimeo *) user_data;
@@ -245,6 +292,12 @@ got_tokens_cb (RestProxy *proxy, gboolean got_tokens, gpointer user_data)
 
   if (got_tokens) {
     RestProxyCall *call;
+    OAuthProxy *upload_proxy = OAUTH_PROXY (priv->proxy);
+
+    oauth_proxy_set_token (OAUTH_PROXY (priv->upload_proxy),
+                           oauth_proxy_get_token (upload_proxy));
+    oauth_proxy_set_token_secret (OAUTH_PROXY (priv->upload_proxy),
+                                  oauth_proxy_get_token_secret (upload_proxy));
 
     call = rest_proxy_new_call (priv->proxy);
     rest_proxy_call_set_function(call, "api/rest/v2");
@@ -321,6 +374,11 @@ sw_service_vimeo_dispose (GObject *object)
   if (priv->simple_proxy) {
     g_object_unref (priv->simple_proxy);
     priv->simple_proxy = NULL;
+  }
+
+  if (priv->upload_proxy) {
+    g_object_unref (priv->upload_proxy);
+    priv->upload_proxy = NULL;
   }
 
   g_free (priv->username);
@@ -739,6 +797,367 @@ collections_iface_init (gpointer g_iface,
                                               _vimeo_collections_get_details);
   sw_collections_iface_implement_create (klass,
                                          _vimeo_collections_create);
+}
+
+/* Video upload interface */
+
+typedef struct {
+  gint opid;
+  GMappedFile *mapped_file;
+  gchar *filename;
+  gchar *ticket_id;
+} VimeoUploadCtx;
+
+static void _upload_get_quota_cb (RestProxyCall *call,
+                                  const GError  *error,
+                                  GObject       *weak_object,
+                                  gpointer       user_data);
+static void _upload_get_ticket_cb (RestProxyCall *call,
+                                   const GError  *error,
+                                   GObject       *weak_object,
+                                   gpointer       user_data);
+static void _upload_video (SwServiceVimeo *self,
+                           const gchar    *upload_endpoint,
+                           VimeoUploadCtx *ctx);
+static void _upload_file_cb (RestProxyCall *call,
+                             const GError  *error,
+                             GObject       *weak_object,
+                             gpointer       user_data);
+static void _upload_verify_cb (RestProxyCall *call,
+                               const GError  *error,
+                               GObject       *weak_object,
+                               gpointer       user_data);
+static void _upload_complete_cb (RestProxyCall *call,
+                                 const GError  *error,
+                                 GObject       *weak_object,
+                                 gpointer       user_data);
+static void _upload_completed (SwServiceVimeo *self, VimeoUploadCtx *ctx);
+
+#define UPLOAD_ERROR(format...)                                              \
+  {                                                                        \
+    gchar *_message = g_strdup_printf (format);                     \
+    sw_video_upload_iface_emit_video_upload_progress (self, ctx->opid, -1, \
+                                                      _message);           \
+    SW_DEBUG (VIMEO, "Error: %s", _message); \
+    g_free (_message);                                                     \
+  }
+
+static void
+vimeo_upload_context_free (VimeoUploadCtx *ctx) {
+  g_free (ctx->filename);
+  g_free (ctx->ticket_id);
+  g_mapped_file_unref (ctx->mapped_file);
+
+  g_slice_free (VimeoUploadCtx, ctx);
+}
+
+VimeoUploadCtx *
+vimeo_upload_context_new (const gchar *filename,
+                          GError **error)
+{
+  GMappedFile *mapped_file = g_mapped_file_new (filename, FALSE, error);
+
+  if (*error != NULL) {
+    return NULL;
+  } else {
+    VimeoUploadCtx *ctx = g_slice_new0 (VimeoUploadCtx);
+
+    ctx->mapped_file = mapped_file;
+    ctx->opid = sw_next_opid ();
+    ctx->filename = g_strdup (filename);
+
+    return ctx;
+  }
+}
+
+static void
+_vimeo_upload_video (SwVideoUploadIface    *self,
+                     const gchar           *filename,
+                     GHashTable            *fields,
+                     DBusGMethodInvocation *context)
+{
+  SwServiceVimeoPrivate *priv = SW_SERVICE_VIMEO (self)->priv;
+  GError *error = NULL;
+  VimeoUploadCtx *ctx;
+
+  ctx = vimeo_upload_context_new (filename,
+                                  &error);
+  if (error != NULL) {
+    dbus_g_method_return_error (context, error);
+    g_error_free (error);
+    return;
+  }
+
+  _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                          _upload_get_quota_cb, G_OBJECT (self), ctx, NULL,
+                          "method", "vimeo.videos.upload.getQuota",
+                          NULL);
+
+  sw_video_upload_iface_return_from_upload_video (context, ctx->opid);
+}
+
+static void
+_upload_get_quota_cb (RestProxyCall *call,
+                      const GError  *error,
+                      GObject       *weak_object,
+                      gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  SwServiceVimeoPrivate *priv = self->priv;
+  GError *err = NULL;
+  RestXmlNode *root = NULL;
+  const gchar *free_space;
+  gint64 free_quota;
+
+  if (error != NULL) {
+    UPLOAD_ERROR ("%s", error->message);
+    goto OUT;
+  }
+
+  root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  free_space = get_child_attribute (root, "upload_space", "free");
+
+  if (free_space == NULL) {
+    UPLOAD_ERROR ("Malformed respose, can't get free space: \n%s",
+                  rest_proxy_call_get_payload (call));
+    goto OUT;
+  }
+
+  free_quota = g_ascii_strtoll (free_space, NULL, 10);
+
+  if (free_quota < g_mapped_file_get_length (ctx->mapped_file)) {
+    UPLOAD_ERROR ("The file is larger than the user's remaining quota, "
+                  "need %li, but only have %li left in quota",
+                  g_mapped_file_get_length (ctx->mapped_file),
+                  free_quota);
+    goto OUT;
+  }
+
+  _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                          _upload_get_ticket_cb, G_OBJECT (self), ctx, NULL,
+                          "method", "vimeo.videos.upload.getTicket",
+                          NULL);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_upload_get_ticket_cb (RestProxyCall *call,
+                       const GError  *error,
+                       GObject       *weak_object,
+                       gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  RestXmlNode *root;
+  const gchar *upload_endpoint;
+  GError *err = NULL;
+
+  root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  ctx->ticket_id = g_strdup (get_child_attribute (root, "ticket", "id"));
+
+  if (ctx->ticket_id == NULL) {
+    UPLOAD_ERROR ("Malformed respose, expected ticket id: \n%s",
+                  rest_proxy_call_get_payload (call));
+    goto OUT;
+  }
+
+  upload_endpoint = get_child_attribute (root, "ticket", "endpoint");
+
+  if (upload_endpoint == NULL) {
+    UPLOAD_ERROR ("Malformed respose, expected upload_endpoint: \n%s",
+                  rest_proxy_call_get_payload (call));
+    goto OUT;
+  }
+
+  _upload_video (self, upload_endpoint, ctx);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+
+}
+
+static void
+_upload_video (SwServiceVimeo *self,
+               const gchar    *upload_endpoint,
+               VimeoUploadCtx *ctx)
+{
+  SwServiceVimeoPrivate *priv = self->priv;
+  gchar *basename;
+  gchar *content_type;
+  RestParam *param;
+  RestProxyCall *upload_call;
+
+  rest_proxy_bind (priv->upload_proxy, upload_endpoint);
+
+  upload_call = rest_proxy_new_call (priv->upload_proxy);
+
+  rest_proxy_call_set_method (upload_call, "POST");
+
+  rest_proxy_call_add_param (upload_call, "chunk_id", "0");
+  rest_proxy_call_add_param (upload_call, "ticket_id", ctx->ticket_id);
+
+  basename = g_path_get_basename (ctx->filename);
+  content_type = g_content_type_guess (
+      ctx->filename,
+      (const guchar*) g_mapped_file_get_contents (ctx->mapped_file),
+      g_mapped_file_get_length (ctx->mapped_file),
+      NULL);
+
+  param =
+    rest_param_new_with_owner ("file_data",
+                               g_mapped_file_get_contents (ctx->mapped_file),
+                               g_mapped_file_get_length (ctx->mapped_file),
+                               content_type,
+                               basename,
+                               g_mapped_file_ref (ctx->mapped_file),
+                               (GDestroyNotify) g_mapped_file_unref);
+
+  rest_proxy_call_add_param_full (upload_call, param);
+
+  rest_proxy_call_async (upload_call,
+                         _upload_file_cb,
+                         G_OBJECT (self),
+                         ctx,
+                         NULL);
+
+  g_object_unref (upload_call);
+  g_free (basename);
+  g_free (content_type);
+}
+
+
+static void
+_upload_file_cb (RestProxyCall *call,
+                 const GError  *error,
+                 GObject       *weak_object,
+                 gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  SwServiceVimeoPrivate *priv = self->priv;
+
+  if (error != NULL) {
+    UPLOAD_ERROR("%s", error->message);
+  } else {
+    _simple_rest_async_run (priv->proxy, "api/rest/v2", _upload_verify_cb,
+                            G_OBJECT (self), ctx, NULL,
+                            "method", "vimeo.videos.upload.verifyChunks",
+                            "ticket_id", ctx->ticket_id,
+                            NULL);
+  }
+}
+
+static void
+_upload_verify_cb (RestProxyCall *call,
+                   const GError  *error,
+                   GObject       *weak_object,
+                   gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  SwServiceVimeoPrivate *priv = self->priv;
+  RestXmlNode *root;
+  const gchar *chunk_size;
+  GError *err = NULL;
+
+  root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  chunk_size = get_child_attribute (root, "chunk", "size");
+
+  if (chunk_size == NULL) {
+    UPLOAD_ERROR ("Malformed respose, expected chunk_size: \n%s",
+                  rest_proxy_call_get_payload (call));
+    goto OUT;
+  }
+
+  if (g_ascii_strtoll (chunk_size, NULL, 10) !=
+      g_mapped_file_get_length (ctx->mapped_file)) {
+    UPLOAD_ERROR ("Expected upload size is %li, but got %li instead",
+                  g_mapped_file_get_length (ctx->mapped_file),
+                  g_ascii_strtoll (chunk_size, NULL, 10));
+    goto OUT;
+  }
+
+  _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                          _upload_complete_cb, G_OBJECT (self), ctx, NULL,
+                          "method", "vimeo.videos.upload.complete",
+                          "ticket_id", ctx->ticket_id,
+                          NULL);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_upload_complete_cb (RestProxyCall *call,
+                     const GError  *error,
+                     GObject       *weak_object,
+                     gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  GError *err = NULL;
+  RestXmlNode *root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  SW_DEBUG (VIMEO, "Complete: %s",
+            get_child_attribute (root, "ticket", "video_id"));
+
+  _upload_completed (self, ctx);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_upload_completed (SwServiceVimeo *self, VimeoUploadCtx *ctx)
+{
+  sw_video_upload_iface_emit_video_upload_progress (self, ctx->opid, 100, "");
+  vimeo_upload_context_free (ctx);
+}
+
+
+/* end of upload call chain */
+
+static void
+video_upload_iface_init (gpointer g_iface, gpointer iface_data)
+{
+  SwVideoUploadIfaceClass *klass = (SwVideoUploadIfaceClass *) g_iface;
+
+  sw_video_upload_iface_implement_upload_video (klass,
+                                                _vimeo_upload_video);
 }
 
 static void
