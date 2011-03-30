@@ -791,8 +791,14 @@ sw_service_vimeo_initable (GInitable     *initable,
 
   priv->inited = TRUE;
 
-  priv->proxy = oauth_proxy_new (api_key, api_secret, "http://vimeo.com/", FALSE);
-  priv->simple_proxy = rest_proxy_new ("http://vimeo.com/api/v2/%s/", TRUE);
+  priv->proxy = g_object_new (OAUTH_TYPE_PROXY,
+                              "consumer-key", api_key,
+                              "consumer-secret", api_secret,
+                              "url-format", "http://vimeo.com/",
+                              "disable-cookies", TRUE,
+                              NULL);
+  priv->upload_proxy = oauth_proxy_new (api_key, api_secret, "%s", TRUE);
+  priv->simple_proxy = rest_proxy_new ("http://%s/api/v2/%s/", TRUE);
 
   priv->album_placeholders =
     g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
