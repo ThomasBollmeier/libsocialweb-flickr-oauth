@@ -58,14 +58,21 @@ G_DEFINE_TYPE_WITH_CODE (SwServiceVimeo, sw_service_vimeo, SW_TYPE_SERVICE,
 
 #define ALBUM_PREFIX "vimeo-"
 
+typedef struct {
+  gchar *title;
+  gchar *description;
+  gchar *real_id;
+} VimeoAlbumPlaceholder;
+
 struct _SwServiceVimeoPrivate {
   RestProxy *proxy;
   RestProxy *simple_proxy;
 
   gboolean configured;
   gboolean inited;
-
   gchar *username;
+
+  GHashTable *album_placeholders;
 };
 
 static const char *
@@ -118,6 +125,26 @@ get_dynamic_caps (SwService *service)
     return configured_caps;
   else
     return no_caps;
+}
+
+static VimeoAlbumPlaceholder *
+album_placeholder_new (const gchar *title,
+                       const gchar *description)
+{
+  VimeoAlbumPlaceholder *placeholder = g_slice_new0 (VimeoAlbumPlaceholder);
+  placeholder->title = g_strdup (title);
+  placeholder->description = g_strdup (description);
+
+  return placeholder;
+}
+
+static void
+album_placeholder_free (VimeoAlbumPlaceholder *placeholder)
+{
+  g_free (placeholder->title);
+  g_free (placeholder->description);
+  g_free (placeholder->real_id);
+  g_slice_free (VimeoAlbumPlaceholder, placeholder);
 }
 
 static RestXmlNode *
@@ -298,6 +325,8 @@ sw_service_vimeo_dispose (GObject *object)
 
   g_free (priv->username);
 
+  g_hash_table_unref (priv->album_placeholders);
+
   G_OBJECT_CLASS (sw_service_vimeo_parent_class)->dispose (object);
 }
 
@@ -454,17 +483,67 @@ _extract_collection_details_from_xml (RestXmlNode *album)
   return value_array;
 }
 
+static GValueArray *
+_create_collection_details_from_placeholder (const gchar *placeholder_id,
+                                             const VimeoAlbumPlaceholder *placeholder)
+{
+  GValueArray *value_array;
+  GHashTable *attribs = g_hash_table_new (g_str_hash, g_str_equal);
+  GValue *value = NULL;
+
+  value_array = g_value_array_new (5);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 0);
+  g_value_init (value, G_TYPE_STRING);
+  g_value_set_static_string (value, placeholder_id);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 1);
+  g_value_init (value, G_TYPE_STRING);
+  g_value_set_static_string (value, placeholder->title);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 2);
+  g_value_init (value, G_TYPE_STRING);
+  g_value_set_static_string (value, "");
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 3);
+  g_value_init (value, G_TYPE_UINT);
+  g_value_set_uint (value, VIDEO);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 4);
+  g_value_init (value, G_TYPE_INT);
+  g_value_set_int (value, 0);
+
+  g_hash_table_insert (attribs, "description", placeholder->description);
+
+  value_array = g_value_array_append (value_array, NULL);
+  value = g_value_array_get_nth (value_array, 5);
+  g_value_init (value, dbus_g_type_get_map ("GHashTable",
+          G_TYPE_STRING,
+          G_TYPE_STRING));
+  g_value_take_boxed (value, attribs);
+
+  return value_array;
+}
+
 static void
 _list_albums_cb (RestProxyCall *call,
                  const GError  *error,
                  GObject       *weak_object,
                  gpointer       user_data)
 {
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
   DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
   RestXmlNode *root = NULL;
   RestXmlNode *album;
   GPtrArray *rv = NULL;
   GError *err = NULL;
+  GHashTableIter iter;
+  gpointer key, value;
 
   if (error != NULL)
     err = g_error_new (SW_SERVICE_ERROR, SW_SERVICE_ERROR_REMOTE_ERROR,
@@ -486,6 +565,16 @@ _list_albums_cb (RestProxyCall *call,
   while (album != NULL) {
     g_ptr_array_add (rv, _extract_collection_details_from_xml (album));
     album = album->next;
+  }
+
+  g_hash_table_iter_init (&iter, self->priv->album_placeholders);
+
+  while (g_hash_table_iter_next (&iter, &key, &value)) {
+    const gchar *placeholder_id = key;
+    const VimeoAlbumPlaceholder *placeholder = value;
+    if (placeholder->real_id == NULL)
+      g_ptr_array_add (rv, _create_collection_details_from_placeholder (placeholder_id,
+                                                                        placeholder));
   }
 
   sw_collections_iface_return_from_get_list (context, rv);
@@ -583,10 +672,26 @@ _vimeo_collections_get_details (SwCollectionsIface *self,
   SwServiceVimeoPrivate *priv = vimeo->priv;
   RestProxyCall *call;
   VimeoAlbumOpCtx *ctx = NULL;
+  VimeoAlbumPlaceholder *placeholder;
 
   g_return_if_fail (priv->simple_proxy != NULL);
 
-  ctx = album_op_ctx_new (context, collection_id, vimeo);
+  placeholder = g_hash_table_lookup (priv->album_placeholders, collection_id);
+
+  if (placeholder != NULL) {
+    if (placeholder->real_id == NULL) {
+      GValueArray *rv = _create_collection_details_from_placeholder (collection_id,
+                                                                     placeholder);
+      sw_collections_iface_return_from_get_details (context, rv);
+      g_value_array_free (rv);
+
+      return;
+    } else {
+      ctx = album_op_ctx_new (context, placeholder->real_id, vimeo);
+    }
+  } else {
+    ctx = album_op_ctx_new (context, collection_id, vimeo);
+  }
 
   call = rest_proxy_new_call (priv->simple_proxy);
   rest_proxy_call_set_function (call, "albums.xml");
@@ -601,6 +706,27 @@ _vimeo_collections_get_details (SwCollectionsIface *self,
 }
 
 static void
+_vimeo_collections_create (SwCollectionsIface *self,
+                                 const gchar *collection_name,
+                                 MediaType supported_types,
+                                 const gchar *collection_parent,
+                                 GHashTable *extra_parameters,
+                                 DBusGMethodInvocation *context)
+{
+  SwServiceVimeo *vimeo = SW_SERVICE_VIMEO (self);
+  SwServiceVimeoPrivate *priv = vimeo->priv;
+  gchar *placeholder_id = g_strdup_printf ("%splaceholder-%u", ALBUM_PREFIX,
+                                           g_random_int ());
+  VimeoAlbumPlaceholder *placeholder =
+    album_placeholder_new (collection_name,
+                           g_hash_table_lookup (extra_parameters, "description"));
+
+  g_hash_table_insert (priv->album_placeholders, placeholder_id, placeholder);
+
+  sw_collections_iface_return_from_create (context, placeholder_id);
+}
+
+static void
 collections_iface_init (gpointer g_iface,
                         gpointer iface_data)
 {
@@ -611,6 +737,8 @@ collections_iface_init (gpointer g_iface,
 
   sw_collections_iface_implement_get_details (klass,
                                               _vimeo_collections_get_details);
+  sw_collections_iface_implement_create (klass,
+                                         _vimeo_collections_create);
 }
 
 static void
@@ -665,6 +793,10 @@ sw_service_vimeo_initable (GInitable     *initable,
 
   priv->proxy = oauth_proxy_new (api_key, api_secret, "http://vimeo.com/", FALSE);
   priv->simple_proxy = rest_proxy_new ("http://vimeo.com/api/v2/%s/", TRUE);
+
+  priv->album_placeholders =
+    g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
+                           (GDestroyNotify) album_placeholder_free);
 
   sw_online_add_notify (online_notify, self);
   refresh_credentials (self);
