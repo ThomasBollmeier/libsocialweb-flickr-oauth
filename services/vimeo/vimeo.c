@@ -809,6 +809,7 @@ typedef struct {
   gchar *video_id;
   gchar *title;
   gchar *description;
+  gchar *collection_id;
 } VimeoUploadCtx;
 
 static void _upload_get_quota_cb (RestProxyCall *call,
@@ -842,6 +843,15 @@ static void _set_description_cb (RestProxyCall *call,
                                  const GError  *error,
                                  GObject       *weak_object,
                                  gpointer       user_data);
+static void _add_video_to_album (SwServiceVimeo *self, VimeoUploadCtx *ctx);
+static void _add_to_album_cb (RestProxyCall *call,
+                              const GError  *error,
+                              GObject       *weak_object,
+                              gpointer       user_data);
+static void _create_album_cb (RestProxyCall *call,
+                              const GError  *error,
+                              GObject       *weak_object,
+                              gpointer       user_data);
 static void _upload_completed (SwServiceVimeo *self, VimeoUploadCtx *ctx);
 
 #define UPLOAD_ERROR(format...)                                              \
@@ -860,6 +870,7 @@ vimeo_upload_context_free (VimeoUploadCtx *ctx) {
   g_free (ctx->video_id);
   g_free (ctx->title);
   g_free (ctx->description);
+  g_free (ctx->collection_id);
   g_mapped_file_unref (ctx->mapped_file);
 
   g_slice_free (VimeoUploadCtx, ctx);
@@ -869,6 +880,7 @@ VimeoUploadCtx *
 vimeo_upload_context_new (const gchar *filename,
                           const gchar *title,
                           const gchar *description,
+                          const gchar *collection_id,
                           GError **error)
 {
   GMappedFile *mapped_file = g_mapped_file_new (filename, FALSE, error);
@@ -883,6 +895,7 @@ vimeo_upload_context_new (const gchar *filename,
     ctx->filename = g_strdup (filename);
     ctx->title = g_strdup (title);
     ctx->description = g_strdup (description);
+    ctx->collection_id = g_strdup (collection_id);
 
     return ctx;
   }
@@ -901,6 +914,7 @@ _vimeo_upload_video (SwVideoUploadIface    *self,
   ctx = vimeo_upload_context_new (filename,
                                   g_hash_table_lookup (fields, "title"),
                                   g_hash_table_lookup (fields, "description"),
+                                  g_hash_table_lookup (fields, "collection"),
                                   &error);
   if (error != NULL) {
     dbus_g_method_return_error (context, error);
@@ -1170,6 +1184,8 @@ _upload_complete_cb (RestProxyCall *call,
                             "description", ctx->description,
                             "video_id", ctx->video_id,
                             NULL);
+  else if (ctx->collection_id != NULL)
+    _add_video_to_album (self, ctx);
   else
     _upload_completed (self, ctx);
 
@@ -1205,6 +1221,8 @@ _set_title_cb (RestProxyCall *call,
                             "description", ctx->description,
                             "video_id", ctx->video_id,
                             NULL);
+  else if (ctx->collection_id != NULL)
+    _add_video_to_album (self, ctx);
   else
     _upload_completed (self, ctx);
 
@@ -1231,6 +1249,116 @@ _set_description_cb (RestProxyCall *call,
   }
 
   SW_DEBUG (VIMEO, "Success setting description");
+
+  if (ctx->collection_id != NULL)
+    _add_video_to_album (self, ctx);
+  else
+    _upload_completed (self, ctx);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_add_video_to_album (SwServiceVimeo *self, VimeoUploadCtx *ctx)
+{
+  SwServiceVimeoPrivate *priv = self->priv;
+  const gchar *real_collection_id = NULL;
+  const VimeoAlbumPlaceholder *placeholder;
+
+  g_return_if_fail (ctx->collection_id != NULL);
+
+  placeholder = g_hash_table_lookup (priv->album_placeholders,
+                                     ctx->collection_id);
+
+  if (placeholder != NULL)
+    real_collection_id = placeholder->real_id;
+  else
+    real_collection_id = ctx->collection_id;
+
+  if (real_collection_id != NULL) {
+    real_collection_id = real_collection_id + strlen (ALBUM_PREFIX);
+    _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                            _add_to_album_cb, G_OBJECT (self), ctx, NULL,
+                            "method", "vimeo.albums.addVideo",
+                            "album_id", real_collection_id,
+                            "video_id", ctx->video_id,
+                            NULL);
+  } else {
+    RestProxyCall *call;
+    g_assert (placeholder != NULL);
+
+    call = rest_proxy_new_call (priv->proxy);
+
+    rest_proxy_call_set_function (call, "api/rest/v2");
+
+    rest_proxy_call_add_params (call,
+                                "method", "vimeo.albums.create",
+                                "title", placeholder->title,
+                                "video_id", ctx->video_id,
+                                NULL);
+
+    if (placeholder->description != NULL)
+      rest_proxy_call_add_param (call, "description",
+                                 placeholder->description);
+
+    rest_proxy_call_async (call, _create_album_cb, G_OBJECT (self), ctx, NULL);
+
+    g_object_unref (call);
+  }
+}
+
+static void
+_add_to_album_cb (RestProxyCall *call,
+                  const GError  *error,
+                  GObject       *weak_object,
+                  gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  GError *err = NULL;
+  RestXmlNode *root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+  } else {
+    _upload_completed (self, ctx);
+  }
+
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_create_album_cb (RestProxyCall *call,
+                  const GError  *error,
+                  GObject       *weak_object,
+                  gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  SwServiceVimeoPrivate *priv = self->priv;
+  GError *err = NULL;
+  RestXmlNode *root = node_from_call (call, &err);
+  VimeoAlbumPlaceholder *placeholder;
+  const gchar *album_id;
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  placeholder = g_hash_table_lookup (priv->album_placeholders,
+                                     ctx->collection_id);
+
+  album_id = get_child_attribute (root, "album", "id");
+
+  SW_DEBUG (VIMEO, "Created album: %s", album_id);
+
+  placeholder->real_id = g_strdup_printf ("%s%s", ALBUM_PREFIX, album_id);
 
   _upload_completed (self, ctx);
 
