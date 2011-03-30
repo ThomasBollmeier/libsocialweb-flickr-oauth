@@ -7,6 +7,6 @@ AuthType=oauth
 [OAuth]
 BaseURL=http://vimeo.com/
 RequestTokenFunction=oauth/request_token
-AuthoriseFunction=oauth/authorize
+AuthoriseFunction=oauth/authorize?permission=write
 AccessTokenFunction=oauth/access_token
 Callback=oob
