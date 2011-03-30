@@ -808,6 +808,7 @@ typedef struct {
   gchar *ticket_id;
   gchar *video_id;
   gchar *title;
+  gchar *description;
 } VimeoUploadCtx;
 
 static void _upload_get_quota_cb (RestProxyCall *call,
@@ -837,6 +838,10 @@ static void _set_title_cb (RestProxyCall *call,
                            const GError  *error,
                            GObject       *weak_object,
                            gpointer       user_data);
+static void _set_description_cb (RestProxyCall *call,
+                                 const GError  *error,
+                                 GObject       *weak_object,
+                                 gpointer       user_data);
 static void _upload_completed (SwServiceVimeo *self, VimeoUploadCtx *ctx);
 
 #define UPLOAD_ERROR(format...)                                              \
@@ -854,6 +859,7 @@ vimeo_upload_context_free (VimeoUploadCtx *ctx) {
   g_free (ctx->ticket_id);
   g_free (ctx->video_id);
   g_free (ctx->title);
+  g_free (ctx->description);
   g_mapped_file_unref (ctx->mapped_file);
 
   g_slice_free (VimeoUploadCtx, ctx);
@@ -862,6 +868,7 @@ vimeo_upload_context_free (VimeoUploadCtx *ctx) {
 VimeoUploadCtx *
 vimeo_upload_context_new (const gchar *filename,
                           const gchar *title,
+                          const gchar *description,
                           GError **error)
 {
   GMappedFile *mapped_file = g_mapped_file_new (filename, FALSE, error);
@@ -875,6 +882,7 @@ vimeo_upload_context_new (const gchar *filename,
     ctx->opid = sw_next_opid ();
     ctx->filename = g_strdup (filename);
     ctx->title = g_strdup (title);
+    ctx->description = g_strdup (description);
 
     return ctx;
   }
@@ -892,6 +900,7 @@ _vimeo_upload_video (SwVideoUploadIface    *self,
 
   ctx = vimeo_upload_context_new (filename,
                                   g_hash_table_lookup (fields, "title"),
+                                  g_hash_table_lookup (fields, "description"),
                                   &error);
   if (error != NULL) {
     dbus_g_method_return_error (context, error);
@@ -1154,6 +1163,13 @@ _upload_complete_cb (RestProxyCall *call,
                             "title", ctx->title,
                             "video_id", ctx->video_id,
                             NULL);
+  else if (ctx->description != NULL)
+    _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                            _set_description_cb, G_OBJECT (self), ctx, NULL,
+                            "method", "vimeo.videos.setDescription",
+                            "description", ctx->description,
+                            "video_id", ctx->video_id,
+                            NULL);
   else
     _upload_completed (self, ctx);
 
@@ -1170,6 +1186,7 @@ _set_title_cb (RestProxyCall *call,
 {
   VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
   SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  SwServiceVimeoPrivate *priv = self->priv;
   GError *err = NULL;
   RestXmlNode *root = node_from_call (call, &err);
 
@@ -1181,6 +1198,39 @@ _set_title_cb (RestProxyCall *call,
 
   SW_DEBUG (VIMEO, "Success setting title");
 
+  if (ctx->description != NULL)
+    _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                            _set_description_cb, G_OBJECT (self), ctx, NULL,
+                            "method", "vimeo.videos.setDescription",
+                            "description", ctx->description,
+                            "video_id", ctx->video_id,
+                            NULL);
+  else
+    _upload_completed (self, ctx);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_set_description_cb (RestProxyCall *call,
+                     const GError  *error,
+                     GObject       *weak_object,
+                     gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  GError *err = NULL;
+  RestXmlNode *root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  SW_DEBUG (VIMEO, "Success setting description");
 
   _upload_completed (self, ctx);
 
