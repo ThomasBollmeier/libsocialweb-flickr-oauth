@@ -806,6 +806,8 @@ typedef struct {
   GMappedFile *mapped_file;
   gchar *filename;
   gchar *ticket_id;
+  gchar *video_id;
+  gchar *title;
 } VimeoUploadCtx;
 
 static void _upload_get_quota_cb (RestProxyCall *call,
@@ -831,6 +833,10 @@ static void _upload_complete_cb (RestProxyCall *call,
                                  const GError  *error,
                                  GObject       *weak_object,
                                  gpointer       user_data);
+static void _set_title_cb (RestProxyCall *call,
+                           const GError  *error,
+                           GObject       *weak_object,
+                           gpointer       user_data);
 static void _upload_completed (SwServiceVimeo *self, VimeoUploadCtx *ctx);
 
 #define UPLOAD_ERROR(format...)                                              \
@@ -846,6 +852,8 @@ static void
 vimeo_upload_context_free (VimeoUploadCtx *ctx) {
   g_free (ctx->filename);
   g_free (ctx->ticket_id);
+  g_free (ctx->video_id);
+  g_free (ctx->title);
   g_mapped_file_unref (ctx->mapped_file);
 
   g_slice_free (VimeoUploadCtx, ctx);
@@ -853,6 +861,7 @@ vimeo_upload_context_free (VimeoUploadCtx *ctx) {
 
 VimeoUploadCtx *
 vimeo_upload_context_new (const gchar *filename,
+                          const gchar *title,
                           GError **error)
 {
   GMappedFile *mapped_file = g_mapped_file_new (filename, FALSE, error);
@@ -865,6 +874,7 @@ vimeo_upload_context_new (const gchar *filename,
     ctx->mapped_file = mapped_file;
     ctx->opid = sw_next_opid ();
     ctx->filename = g_strdup (filename);
+    ctx->title = g_strdup (title);
 
     return ctx;
   }
@@ -881,6 +891,7 @@ _vimeo_upload_video (SwVideoUploadIface    *self,
   VimeoUploadCtx *ctx;
 
   ctx = vimeo_upload_context_new (filename,
+                                  g_hash_table_lookup (fields, "title"),
                                   &error);
   if (error != NULL) {
     dbus_g_method_return_error (context, error);
@@ -1122,6 +1133,7 @@ _upload_complete_cb (RestProxyCall *call,
 {
   VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
   SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  SwServiceVimeoPrivate *priv = self->priv;
   GError *err = NULL;
   RestXmlNode *root = node_from_call (call, &err);
 
@@ -1131,8 +1143,44 @@ _upload_complete_cb (RestProxyCall *call,
     goto OUT;
   }
 
-  SW_DEBUG (VIMEO, "Complete: %s",
-            get_child_attribute (root, "ticket", "video_id"));
+  ctx->video_id = g_strdup (get_child_attribute (root, "ticket", "video_id"));
+
+  SW_DEBUG (VIMEO, "Complete: %s", ctx->video_id);
+
+  if (ctx->title != NULL)
+    _simple_rest_async_run (priv->proxy, "api/rest/v2",
+                            _set_title_cb, G_OBJECT (self), ctx, NULL,
+                            "method", "vimeo.videos.setTitle",
+                            "title", ctx->title,
+                            "video_id", ctx->video_id,
+                            NULL);
+  else
+    _upload_completed (self, ctx);
+
+ OUT:
+  if (root != NULL)
+    rest_xml_node_unref (root);
+}
+
+static void
+_set_title_cb (RestProxyCall *call,
+               const GError  *error,
+               GObject       *weak_object,
+               gpointer       user_data)
+{
+  VimeoUploadCtx *ctx = (VimeoUploadCtx *) user_data;
+  SwServiceVimeo *self = SW_SERVICE_VIMEO (weak_object);
+  GError *err = NULL;
+  RestXmlNode *root = node_from_call (call, &err);
+
+  if (err != NULL) {
+    UPLOAD_ERROR ("%s", err->message);
+    g_error_free (err);
+    goto OUT;
+  }
+
+  SW_DEBUG (VIMEO, "Success setting title");
+
 
   _upload_completed (self, ctx);
 
