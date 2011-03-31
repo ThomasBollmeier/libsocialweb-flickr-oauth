@@ -101,6 +101,7 @@ get_static_caps (SwService *service)
     HAS_QUERY_IFACE,
     HAS_BANISHABLE_IFACE,
     HAS_COLLECTIONS_IFACE,
+    HAS_VIDEO_UPLOAD_IFACE,
 
     NULL
   };
