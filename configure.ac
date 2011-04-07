@@ -124,6 +124,33 @@ AS_IF(
         AC_MSG_RESULT([no])
 )
 
+AC_MSG_CHECKING([whether to use kernel keyring via libkeyutils])
+AC_ARG_WITH([kernel-keyring], [AS_HELP_STRING([--with-kernel-keyring], [enable support for kernel keyring])],
+            [], [with_kernel_keyring=yes])
+
+KEYUTILS_CFLAGS=""
+KEYUTILS_LIBS=""
+
+AS_IF(
+        [test "$with_kernel_keyring" = "yes"],
+        [
+                AC_CHECK_HEADER([keyutils.h],
+                        [AC_CHECK_LIB([keyutils], [keyctl_read], [have_keyutils="yes"])]
+                )
+                if test "$have_keyutils" != "yes"; then
+                        AC_MSG_ERROR([The keyutils library (or developer files) was not found])
+                else
+                        AC_MSG_RESULT([yes])
+                        KEYUTILS_LIBS="-lkeyutils"
+                        AC_DEFINE([WITH_KEYUTILS], 1, [Use keyutils and kernel keyring])
+                fi
+        ]
+        AC_MSG_RESULT([no])
+)
+
+AC_SUBST(KEYUTILS_CFLAGS)
+AC_SUBST(KEYUTILS_LIBS)
+
 AC_ARG_ENABLE([all-services],[AS_HELP_STRING([--enable-all-services], [enable every service])],
               [], [enable_all_services=no])
 
