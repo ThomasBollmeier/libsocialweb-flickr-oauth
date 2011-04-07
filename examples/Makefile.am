@@ -10,4 +10,9 @@ monitor_caps_LDFLAGS = $(DBUS_GLIB_LIBS) \
 		      $(top_builddir)/libsocialweb-client/libsocialweb-client.la
 monitor_caps_SOURCES = monitor-caps.c
 
-EXTRA_DIST = monitor.py
+all-local:
+	chmod +x request-api-key.sh
+
+EXTRA_DIST = \
+	monitor.py \
+	request-api-key.sh

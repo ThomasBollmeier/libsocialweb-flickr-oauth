@@ -26,10 +26,16 @@
  */
 
 #include <config.h>
+#include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include <glib.h>
 #include <gio/gio.h>
 #include "sw-keystore.h"
+
+#if WITH_KEYUTILS
+#include <keyutils.h>
+#endif
 
 typedef struct {
   char *key;
@@ -165,6 +171,70 @@ get_keys_hash (void)
   return once.retval;
 }
 
+#ifdef WITH_KEYUTILS
+
+static gboolean
+lookup_key_in_kernel (const char *service, const char **key, const char **secret)
+{
+  gchar *description;
+  key_serial_t serial;
+  KeyData *data;
+  gchar *buffer = NULL;
+  const gchar *end;
+  const gchar *line;
+  long len;
+
+  description = g_strdup_printf ("libsocialweb:%s", service);
+  serial = request_key ("user", description, service,
+                        KEY_SPEC_SESSION_KEYRING);
+  g_free (description);
+
+  if (serial == -1) {
+    g_warning (G_STRLOC ": couldn't lookup key in kernel: %s",
+               g_strerror (errno));
+    return FALSE;
+ }
+
+  len = keyctl_read_alloc (serial, (void**)&buffer);
+  if (len == -1) {
+    g_warning (G_STRLOC ": couldn't read key from kernel: %s",
+               g_strerror (errno));
+    return FALSE;
+  }
+
+  data = g_new0 (KeyData, 1);
+  end = buffer + len;
+
+  /* See if there are two values separated by a line break */
+  line = memchr (buffer, '\n', len);
+  if (line == NULL)
+    line = end;
+
+  /* If either line is empty, that part becomes NULL */
+  if (line == buffer)
+    data->key = NULL;
+  else
+    data->key = g_strndup (buffer, line - buffer);
+  if (line != end) {
+    line++;
+    if (line == end)
+      data->secret = NULL;
+    else
+      data->secret = g_strndup (line, end - line);
+  }
+
+  free (buffer);
+
+  g_hash_table_replace (get_keys_hash (), g_strdup (service), data);
+  *key = data->key;
+  if (secret)
+    *secret = data->secret;
+
+  return TRUE;
+}
+
+#endif /* WITH_KEYUTILS */
+
 gboolean
 sw_keystore_get_key_secret (const char *service, const char **key, const char **secret)
 {
@@ -180,12 +250,19 @@ sw_keystore_get_key_secret (const char *service, const char **key, const char **
     if (secret)
       *secret = data->secret;
     return TRUE;
-  } else {
-    *key = NULL;
-    if (secret)
-      *secret = NULL;
-    return FALSE;
   }
+
+#if ! BUILD_TESTS
+#ifdef WITH_KEYUTILS
+  if (lookup_key_in_kernel (service, key, secret))
+    return TRUE;
+#endif
+#endif
+
+  *key = NULL;
+  if (secret)
+    *secret = NULL;
+  return FALSE;
 }
 
 const char *
