@@ -2,3 +2,17 @@ libsocialweb-keystore
 ===
 
 A simple library which provides access to web service API keys.
+
+
+--------------------------------------------------------------------------------
+                    KERNEL KEYRING OBFUSCATION (prototype)
+
+libsocialweb-keystore has the ability to lookup API keys in the linux kernel
+keyring. This allows obfuscation and obscurity for loaded API keys. This should
+not be seen as a security feature, but rather as an obscurity feature.
+
+To use the kernel keyring, configure libsocialweb with the --with-kernel-keyring
+option. Make sure libkeyutils (and development libraries) are installed.
+
+See examples/request-api-key.sh for an example of how to load these keys into
+the kernel keyring on demand.

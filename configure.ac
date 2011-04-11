@@ -124,6 +124,9 @@ AS_IF(
         AC_MSG_RESULT([no])
 )
 
+# ------------------------------------------------------------------------------
+# Kernel Keyring
+
 AC_MSG_CHECKING([whether to use kernel keyring via libkeyutils])
 AC_ARG_WITH([kernel-keyring], [AS_HELP_STRING([--with-kernel-keyring], [enable support for kernel keyring])],
             [], [with_kernel_keyring=yes])
@@ -150,6 +153,8 @@ AS_IF(
 
 AC_SUBST(KEYUTILS_CFLAGS)
 AC_SUBST(KEYUTILS_LIBS)
+
+# ------------------------------------------------------------------------------
 
 AC_ARG_ENABLE([all-services],[AS_HELP_STRING([--enable-all-services], [enable every service])],
               [], [enable_all_services=no])

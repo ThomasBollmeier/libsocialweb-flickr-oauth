@@ -9,5 +9,5 @@
 KEY="THEKEYHERE
 THESECRETHERE"
 
-echo "requesting key with args: $@" >> /tmp/request-api-key.log
+echo "requesting key with args: $@" >&2
 keyctl instantiate $1 "$KEY" $4 || exit 1
