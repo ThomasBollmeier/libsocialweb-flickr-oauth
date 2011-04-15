@@ -169,6 +169,7 @@ SOCIALWEB_ENABLE_SERVICE(Twitter, twitter, TWITTER)
 SOCIALWEB_ENABLE_SERVICE(Vimeo, vimeo, VIMEO)
 SOCIALWEB_ENABLE_SERVICE(Youtube, youtube, YOUTUBE)
 SOCIALWEB_ENABLE_SERVICE(Sina, sina, SINA)
+SOCIALWEB_ENABLE_SERVICE(Myspace, myspace, MYSPACE)
 
 servicesdir='${libdir}'/libsocialweb/services
 AC_SUBST(servicesdir)
@@ -262,6 +263,7 @@ AC_OUTPUT([
         services/vimeo/Makefile
         services/youtube/Makefile
         services/sina/Makefile
+        services/myspace/Makefile
         tests/Makefile
         tools/Makefile
         examples/Makefile
