@@ -11,6 +11,14 @@ libsocialweb_keystore_la_SOURCES = \
 libsocialweb_keystore_la_HEADERS = \
 	sw-keystore.h
 
+noinst_PROGRAMS = \
+	frob-keystore
+
+frob_keystore_CFLAGS = \
+	-I$(top_srcdir) $(GLIB_CFLAGS) $(GOBJECT_CFLAGS)
+
+frob_keystore_LDADD = \
+	libsocialweb-keystore.la
 
 TESTS = test-suite
 check_PROGRAMS = test-suite
