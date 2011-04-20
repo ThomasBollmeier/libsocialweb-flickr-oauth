@@ -129,7 +129,7 @@ AS_IF(
 
 AC_MSG_CHECKING([whether to use kernel keyring via libkeyutils])
 AC_ARG_WITH([kernel-keyring], [AS_HELP_STRING([--with-kernel-keyring], [enable support for kernel keyring])],
-            [], [with_kernel_keyring=yes])
+            [], [with_kernel_keyring=no])
 
 KEYUTILS_CFLAGS=""
 KEYUTILS_LIBS=""
