@@ -147,7 +147,7 @@ AS_IF(
                         KEYUTILS_LIBS="-lkeyutils"
                         AC_DEFINE([WITH_KEYUTILS], 1, [Use keyutils and kernel keyring])
                 fi
-        ]
+        ],
         AC_MSG_RESULT([no])
 )
 
