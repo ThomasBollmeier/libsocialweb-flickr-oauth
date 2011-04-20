@@ -18,7 +18,9 @@ frob_keystore_CFLAGS = \
 	-I$(top_srcdir) $(GLIB_CFLAGS) $(GOBJECT_CFLAGS)
 
 frob_keystore_LDADD = \
-	libsocialweb-keystore.la
+	libsocialweb-keystore.la \
+	$(GLIB_LIBS) $(GOBJECT_LIBS)
+
 
 TESTS = test-suite
 check_PROGRAMS = test-suite
