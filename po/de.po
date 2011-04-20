@@ -2,15 +2,15 @@
 # Copyright (C) YEAR THE libsocialweb'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the libsocialweb package.
 # Tomás Galicia <tomas.galicia@intel.com>, 2010.
-# Mario Blättermann <mariobl@gnome.org>, 2011.
+# Mario Blättermann <mariobl@freenet.de>, 2011.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: libsocialweb master\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-02-25 15:33+0000\n"
-"PO-Revision-Date: 2011-02-26 22:04+0100\n"
-"Last-Translator: Mario Blättermann <mariobl@gnome.org>\n"
+"POT-Creation-Date: 2011-04-19 18:13+0000\n"
+"PO-Revision-Date: 2011-04-19 20:52+0100\n"
+"Last-Translator: Mario Blättermann <mariobl@freenet.de>\n"
 "Language-Team: Deutsch <gnome-de@gnome.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -43,11 +43,13 @@ msgstr ""
 
 #. Translators "[track title] by [artist]"
 #: ../services/lastfm/lastfm-item-view.c:361
+#: ../services/lastfm/lastfm-contact-view.c:356
 #, c-format
 msgid "%s by %s"
 msgstr "%s von %s"
 
 #: ../services/lastfm/lastfm-item-view.c:365
+#: ../services/lastfm/lastfm-contact-view.c:360
 msgid "Unknown"
 msgstr "Unbekannt"
 
@@ -62,10 +64,11 @@ msgid ""
 "you to other people who like what you like - and recommend songs from their "
 "music collections and yours too."
 msgstr ""
-"Last.fm ist ein Internetradio-Service, der lernt, was Ihnen gefällt. Jeder "
-"gespielte Musiktitel sagt Ihrem Last.fm-Profil etwas über Ihren Geschmack. "
-"Last.fm kann Sie mit anderen Leuten verbinden, die einen ähnlichen "
-"Musikgeschmack haben und Ihnen Songs von ihren Sammlungen empfehlen."
+"Last.fm ist ein Internetradio-Service, der sich merkt, was Ihnen gefällt. "
+"Jeder gespielte Musiktitel sagt Ihrem Last.fm-Profil etwas über Ihren "
+"Geschmack. Last.fm kann Sie mit anderen Leuten verbinden, die einen "
+"ähnlichen Musikgeschmack haben und Ihnen Songs aus deren Sammlungen "
+"empfehlen."
 
 #: ../services/smugmug/smugmug.keys.in.h:1
 msgid "SmugMug"
@@ -80,9 +83,8 @@ msgstr ""
 "passionierter Besucher."
 
 #. This format is for tweets announcing twitpic URLs, "[tweet] [url]".
-#: ../services/twitter/twitter.c:772
+#: ../services/twitter/twitter.c:829
 #, c-format
-#| msgid "%s by %s"
 msgid "%s %s"
 msgstr "%s %s"
 
@@ -107,10 +109,10 @@ msgstr ""
 msgid ""
 "From the beginning, Vimeo was created by filmmakers and video creators who "
 "wanted to share their creative work, along with intimate personal moments of "
-"their everyday life. As time went on, like-minded people came to the site and "
-"built a community of positive, encouraging individuals with a wide range of "
-"video interests. We hope that you feel inspired to show us both your creative "
-"side as well as your friendly side."
+"their everyday life. As time went on, like-minded people came to the site "
+"and built a community of positive, encouraging individuals with a wide range "
+"of video interests. We hope that you feel inspired to show us both your "
+"creative side as well as your friendly side."
 msgstr ""
 "Ursprünglich wurde Vimeo von Filmemachern und Videoproduzenten gegründet, um "
 "einerseits ihre kreativen Arbeiten und andererseits auch ganz persönliche "
@@ -123,6 +125,18 @@ msgstr ""
 #: ../services/vimeo/vimeo.keys.in.h:2
 msgid "Vimeo"
 msgstr "Vimeo"
+
+#: ../services/photobucket/photobucket.keys.in.h:1
+msgid "Photobucket"
+msgstr "Photobucket"
+
+#: ../services/photobucket/photobucket.keys.in.h:2
+msgid ""
+"Snap and show it off! Photobucket makes it easy to share your photos and "
+"videos anywhere."
+msgstr ""
+"Knipsen und vorzeigen! Photobucket macht es einfach, Ihre Fotos und Videos "
+"mit anderen zu teilen."
 
 #: ../services/plurk/plurk.keys.in.h:1
 msgid "Plurk"
@@ -147,24 +161,3 @@ msgstr "Youtube"
 #: ../services/youtube/youtube.keys.in.h:2
 msgid "Youtube is a popular video sharing website"
 msgstr "Youtube ist eine populäre Webseite zum Veröffentlichen von Videos"
-
-#~ msgid "MySpace"
-#~ msgstr "MySpace"
-
-#~ msgid ""
-#~ "MySpace is a leading social portal for connecting people, content, and "
-#~ "culture from around the world. Create a profile, share photos, "
-#~ "professional and viral videos, blog, instant message your friends, and "
-#~ "listen to music on the world’s largest music community."
-#~ msgstr ""
-#~ "MySpace ist ein führendes soziales Netzwerk, welches Menschen und Kulturen "
-#~ "weltweit miteinander verbindet. Erstelle ein Profil, veröffentliche Fotos, "
-#~ "professionelle und virale Videos, schreibe Blog-Einträge, chatte mit "
-#~ "deinen Freunden und höre dir Musik in der größten Musikgemeinde der Welt "
-#~ "an."
-
-#~ msgid "Digg"
-#~ msgstr "Digg"
-
-#~ msgid "Digg - to share news, video and images"
-#~ msgstr "Digg - Nachrichten, Videos und Bilder teilen"
