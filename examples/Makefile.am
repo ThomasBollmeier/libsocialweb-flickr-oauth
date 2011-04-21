@@ -11,7 +11,7 @@ monitor_caps_LDFLAGS = $(DBUS_GLIB_LIBS) \
 monitor_caps_SOURCES = monitor-caps.c
 
 all-local:
-	chmod +x request-api-key.sh
+	chmod +x $(top_srcdir)/examples/request-api-key.sh
 
 EXTRA_DIST = \
 	monitor.py \
