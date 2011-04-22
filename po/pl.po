@@ -8,8 +8,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: libsocialweb\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-03-10 13:17+0100\n"
-"PO-Revision-Date: 2011-03-10 13:26+0100\n"
+"POT-Creation-Date: 2011-04-22 12:52+0200\n"
+"PO-Revision-Date: 2011-04-22 13:01+0200\n"
 "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
 "Language-Team: Polish <gnomepl@aviary.pl>\n"
 "Language: pl\n"
@@ -44,11 +44,13 @@ msgstr ""
 
 #. Translators "[track title] by [artist]"
 #: ../services/lastfm/lastfm-item-view.c:361
+#: ../services/lastfm/lastfm-contact-view.c:356
 #, c-format
 msgid "%s by %s"
 msgstr "%s w wykonaniu %s"
 
 #: ../services/lastfm/lastfm-item-view.c:365
+#: ../services/lastfm/lastfm-contact-view.c:360
 msgid "Unknown"
 msgstr "Nieznany"
 
@@ -82,7 +84,7 @@ msgstr ""
 "klientów z pasją."
 
 #. This format is for tweets announcing twitpic URLs, "[tweet] [url]".
-#: ../services/twitter/twitter.c:772
+#: ../services/twitter/twitter.c:829
 #, c-format
 msgid "%s %s"
 msgstr "%s %s"
@@ -153,3 +155,18 @@ msgstr "YouTube"
 #: ../services/youtube/youtube.keys.in.h:2
 msgid "Youtube is a popular video sharing website"
 msgstr "YouTube to popularny serwis do współdzielenia się nagraniami wideo"
+
+#: ../services/myspace/myspace.keys.in.h:1
+msgid "MySpace"
+msgstr "MySpace"
+
+# no need to be so chatty
+#: ../services/myspace/myspace.keys.in.h:2
+msgid ""
+"MySpace is a leading social portal for connecting people, content, and "
+"culture from around the world. Create a profile, share photos, professional "
+"and viral videos, blog, instant message your friends, and listen to music on "
+"the world’s largest music community."
+msgstr ""
+"MySpace jest wiodącym serwisem społecznościowym, łączącym ludzi, treści i "
+"kulturę z całego świata."
