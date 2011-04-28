@@ -8,8 +8,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: libsocialweb master\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-03-12 15:29+0000\n"
-"PO-Revision-Date: 2011-03-18 14:15+0100\n"
+"POT-Creation-Date: 2011-04-25 19:37+0000\n"
+"PO-Revision-Date: 2011-04-28 20:42+0100\n"
 "Last-Translator: Matej Urbančič <mateju@svn.gnome.org>\n"
 "Language-Team: Slovenian GNOME Translation Team <gnome-si@googlegroups.com>\n"
 "Language: \n"
@@ -39,11 +39,13 @@ msgstr "Flickr - odličen spletni upravljalnik slikovnega materiala za prikazova
 
 #. Translators "[track title] by [artist]"
 #: ../services/lastfm/lastfm-item-view.c:361
+#: ../services/lastfm/lastfm-contact-view.c:356
 #, c-format
 msgid "%s by %s"
 msgstr "%s - %s"
 
 #: ../services/lastfm/lastfm-item-view.c:365
+#: ../services/lastfm/lastfm-contact-view.c:360
 msgid "Unknown"
 msgstr "Neznano"
 
@@ -64,7 +66,7 @@ msgid "Your Photos Look Better Here. Billions of happy photos. Millions of passi
 msgstr "Fotografije tu so videti lepše. Milijarde dobrih slik. Milijoni zadovoljnih uporabnikov."
 
 #. This format is for tweets announcing twitpic URLs, "[tweet] [url]".
-#: ../services/twitter/twitter.c:772
+#: ../services/twitter/twitter.c:829
 #, c-format
 msgid "%s %s"
 msgstr "%s %s"
@@ -116,4 +118,12 @@ msgstr "Youtube"
 #: ../services/youtube/youtube.keys.in.h:2
 msgid "Youtube is a popular video sharing website"
 msgstr "Youtube je priljubljeno spletišče z video posnetki"
+
+#: ../services/myspace/myspace.keys.in.h:1
+msgid "MySpace"
+msgstr "x"
+
+#: ../services/myspace/myspace.keys.in.h:2
+msgid "MySpace is a leading social portal for connecting people, content, and culture from around the world. Create a profile, share photos, professional and viral videos, blog, instant message your friends, and listen to music on the world’s largest music community."
+msgstr "Portal MySpace je vodilno spletno mesto za povezovanje posameznikov in vsebine. Ustvarite si profil, objavite vaše fotografije, video posnetke, napišite glog, hipna sporočila in poslušajte glasbo v največji glasbeni skupnosti na svetu."
 
