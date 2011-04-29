@@ -245,21 +245,6 @@ sw_contact_get_all (const SwContact *contact, const char *key)
         g_intern_string (key));
 }
 
-static void
-cache_date (SwContact *contact)
-{
-  const char *s;
-
-  if (contact->priv->cached_date)
-    return;
-
-  s = sw_contact_get (contact, "date");
-  if (!s)
-    return;
-
-  contact->priv->cached_date = sw_time_t_from_string (s);
-}
-
 void
 sw_contact_dump (SwContact *contact)
 {
