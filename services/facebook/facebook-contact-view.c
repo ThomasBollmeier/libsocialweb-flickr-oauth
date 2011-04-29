@@ -164,7 +164,6 @@ static SwSet*
 _facebook_update_node_to_set (SwContactView *self,
                               JsonNode   *root)
 {
-  SwFacebookContactViewPrivate *priv = GET_PRIVATE (self);
   JsonObject *root_object = NULL;
   JsonNode *statuses = NULL;
   JsonArray *updates_array = NULL;
