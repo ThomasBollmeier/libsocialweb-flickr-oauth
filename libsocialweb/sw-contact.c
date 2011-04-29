@@ -516,7 +516,7 @@ sw_contact_save_into_cache (SwCacheable *cacheable, GKeyFile *keys,
   g_key_file_set_string (keys, group, "type", "contact");
 
   g_hash_table_iter_init (&iter, sw_contact_peek_hash (contact));
-  while (g_hash_table_iter_next (&iter, (gpointer)&key, &value)) {
+  while (g_hash_table_iter_next (&iter, (gpointer)&key, (gpointer)&value)) {
     g_key_file_set_string_list (keys, group, key, value,
         g_strv_length (value));
   }
