@@ -472,6 +472,12 @@ sw_item_get_id (SwCacheable *cacheable)
   return sw_item_get (self, "id");
 }
 
+static gboolean
+sw_item_is_ready (SwCacheable *cacheable)
+{
+  return sw_item_get_ready (SW_ITEM (cacheable));
+}
+
 static void
 sw_item_save_into_cache (SwCacheable *cacheable, GKeyFile *keys,
                          const gchar *group)
@@ -509,6 +515,6 @@ sw_item_cacheable_init (SwCacheableInterface *iface,
                            gpointer user_data)
 {
   iface->get_id = sw_item_get_id;
-  iface->is_ready = sw_item_get_ready;
+  iface->is_ready = sw_item_is_ready;
   iface->save_into_cache = sw_item_save_into_cache;
 }
