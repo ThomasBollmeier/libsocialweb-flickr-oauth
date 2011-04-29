@@ -230,7 +230,7 @@ construct_image_url (const char *uid,
   if (has_profile == 1 && avatar <= 0)
     url = g_strdup_printf ("http://avatars.plurk.com/%s-medium.gif", uid);
   else if (has_profile == 1 && avatar > 0)
-    url = g_strdup_printf ("http://avatars.plurk.com/%s-medium%lld.gif", uid, avatar);
+    url = g_strdup_printf ("http://avatars.plurk.com/%s-medium%" G_GINT64_FORMAT ".gif", uid, avatar);
   else
     url = g_strdup_printf ("http://www.plurk.com/static/default_medium.gif");
 
@@ -295,7 +295,7 @@ make_item (SwService *service, JsonNode *plurk_node, JsonNode *plurk_users)
 
   /* Get the user object */
   id = json_object_get_int_member (plurk, "owner_id");
-  uid = g_strdup_printf ("%lld", id);
+  uid = g_strdup_printf ("%"G_GINT64_FORMAT, id);
   object = json_node_get_object (plurk_users);
   node = json_object_get_member (object, uid);
   user = json_node_get_object (node);
@@ -308,7 +308,7 @@ make_item (SwService *service, JsonNode *plurk_node, JsonNode *plurk_users)
 
   /* Construct the id of sw_item */
   id = json_object_get_int_member (plurk, "plurk_id");
-  pid = g_strdup_printf ("%lld", id);
+  pid = g_strdup_printf ("%"G_GINT64_FORMAT, id);
   sw_item_take (item, "id", g_strconcat ("plurk-", pid, NULL));
 
   /* Get the display name of the user */

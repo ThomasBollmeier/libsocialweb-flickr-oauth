@@ -128,7 +128,7 @@ construct_image_url (const char *uid,
   if (has_profile == 1 && avatar <= 0)
     url = g_strdup_printf ("http://avatars.plurk.com/%s-medium.gif", uid);
   else if (has_profile == 1 && avatar > 0)
-    url = g_strdup_printf ("http://avatars.plurk.com/%s-medium%lld.gif", uid, avatar);
+    url = g_strdup_printf ("http://avatars.plurk.com/%s-medium%" G_GINT64_FORMAT ".gif", uid, avatar);
   else
     url = g_strdup_printf ("http://www.plurk.com/static/default_medium.gif");
 
@@ -219,7 +219,7 @@ construct_user_data (SwServicePlurk* plurk, JsonNode *root)
 
   has_profile = json_object_get_int_member (object, "has_profile_image");
 
-  uid = g_strdup_printf ("%lld", id);
+  uid = g_strdup_printf ("%"G_GINT64_FORMAT, id);
 
   priv->user_id = (char *) uid;
   priv->image_url = construct_image_url (uid, avatar, has_profile);
