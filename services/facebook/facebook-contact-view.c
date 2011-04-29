@@ -64,64 +64,6 @@ enum /* properties */
   PROP_PARAMS
 };
 
-static char*
-_facebook_status_node_get_link (JsonNode *status_node)
-{
-  JsonObject *status_object = json_node_get_object (status_node);
-  char *url = get_child_node_value (status_node, "link");
-
-  if (url == NULL)
-    {
-      /* try to extract a link to the 'comment' action for this post, which
-       * serves as a 'permalink' for a particular status update */
-      JsonArray *actions = NULL;
-      JsonNode *actions_node = json_object_get_member (status_object,
-                                                       "actions");
-
-      if (actions_node != NULL)
-        actions = json_node_get_array (actions_node);
-
-      if (actions != NULL)
-        {
-          guint j;
-
-          for (j = 0; j < json_array_get_length (actions); j++)
-            {
-              JsonNode *action = json_array_get_element (actions, j);
-              char *action_name;
-
-              action_name = get_child_node_value (action, "name");
-
-              if (action_name == NULL)
-                {
-                  continue;
-                }
-              else if (g_ascii_strcasecmp (action_name, "Comment") != 0)
-                {
-                  g_free (action_name);
-
-                  continue;
-                }
-
-              g_free (action_name);
-
-              url = get_child_node_value (action, "link");
-
-              break;
-            }
-          }
-    }
-
-  if (url == NULL)
-    {
-      /* can't find a decent url to associate with this post, so just link to
-       * the facebook homepage */
-      url = g_strdup ("http://www.facebook.com");
-    }
-
-  return url;
-}
-
 static void
 update_contact_from_node (SwContact      *dest_contact,
                        const gchar *dest_name,
