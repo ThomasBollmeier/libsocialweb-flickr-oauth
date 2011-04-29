@@ -486,7 +486,7 @@ sw_item_save_into_cache (SwCacheable *cacheable, GKeyFile *keys,
   g_key_file_set_string (keys, group, "type", "item");
 
   g_hash_table_iter_init (&iter, sw_item_peek_hash (item));
-  while (g_hash_table_iter_next (&iter, (gpointer)&key, &value)) {
+  while (g_hash_table_iter_next (&iter, (gpointer)&key, (gpointer)&value)) {
     char *new_value;
     /*
      * We make relative paths when saving so that the cache files are portable
