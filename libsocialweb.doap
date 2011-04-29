@@ -6,6 +6,7 @@
 
   <name xml:lang="en">libsocialweb</name>
   <shortdesc xml:lang="en">Social web services integration framework</shortdesc>
+  <bug-database  rdf:resource="https://bugzilla.gnome.org/browse.cgi?product=libsocialweb" />
 
   <maintainer>
     <foaf:Person>
