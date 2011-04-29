@@ -221,7 +221,6 @@ make_item (SwService *service, JsonNode *entry)
   JsonNode *author;
   JsonObject *entry_obj, *author_obj;
   const char *tmp;
-  char *status;
 
   item = sw_item_new ();
   sw_item_set_service (item, service);
@@ -257,8 +256,9 @@ make_item (SwService *service, JsonNode *entry)
   sw_item_request_image_fetch (item, FALSE, "authoricon", g_strdup (tmp));;
 
   /* Get the content */
-  status = json_object_get_string_member (entry_obj, "status");
-  sw_item_put (item, "content", sw_unescape_entities ((gchar *)status));
+  tmp = json_object_get_string_member (entry_obj, "status");
+  /* sw_unescape_entities works in place -> must duplicate before */
+  sw_item_take (item, "content", sw_unescape_entities (g_strdup (tmp)));
   /* TODO: if mood is not "(none)" then append that to the status message */
 
   /* Get the date */
