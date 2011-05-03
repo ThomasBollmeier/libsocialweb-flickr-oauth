@@ -1,18 +1,20 @@
-#  Tomás Galicia <tomas.galicia@intel.com>
-#  Djavan Fagundes <djavan@syst.com.br>, 2010.
-#  Felipe Borges <felipe10borges@gmail.com>, 2011.
+# Tomás Galicia <tomas.galicia@intel.com>
+# Djavan Fagundes <djavan@syst.com.br>, 2010, 2011.
+# Felipe Borges <felipe10borges@gmail.com>, 2011.
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-02-25 15:33+0000\n"
-"PO-Revision-Date: \n"
-"Last-Translator: Felipe Borges <felipe10borges@gmail.com>\n"
-"Language-Team: \n"
+"POT-Creation-Date: 2011-04-25 19:37+0000\n"
+"PO-Revision-Date: 2011-05-03 15:45-0200\n"
+"Last-Translator: Djavan Fagundes <djavan@syst.com.br>\n"
+"Language-Team: Brazilian Portuguese <gnome-pt_br-list@gnome.org>\n"
+"Language: pt_BR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Poedit-Language: Portuguese\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Virtaal 0.6.1\n"
 "X-Poedit-SourceCharset: utf-8\n"
 
 #: ../services/facebook/facebook.keys.in.h:1
@@ -39,11 +41,13 @@ msgstr ""
 
 #. Translators "[track title] by [artist]"
 #: ../services/lastfm/lastfm-item-view.c:361
+#: ../services/lastfm/lastfm-contact-view.c:356
 #, c-format
 msgid "%s by %s"
 msgstr "%s por %s"
 
 #: ../services/lastfm/lastfm-item-view.c:365
+#: ../services/lastfm/lastfm-contact-view.c:360
 msgid "Unknown"
 msgstr "Desconhecido"
 
@@ -76,7 +80,7 @@ msgstr ""
 "usuários apaixonados."
 
 #. This format is for tweets announcing twitpic URLs, "[tweet] [url]".
-#: ../services/twitter/twitter.c:772
+#: ../services/twitter/twitter.c:829
 #, c-format
 msgid "%s %s"
 msgstr "%s %s"
@@ -115,6 +119,18 @@ msgstr ""
 msgid "Vimeo"
 msgstr "Vimeo"
 
+#: ../services/photobucket/photobucket.keys.in.h:1
+msgid "Photobucket"
+msgstr "Photobucket"
+
+#: ../services/photobucket/photobucket.keys.in.h:2
+msgid ""
+"Snap and show it off! Photobucket makes it easy to share your photos and "
+"videos anywhere."
+msgstr ""
+"Ajuste e apresente! Photobucket facilita o compartilhamento de fotos e "
+"vídeos em qualquer lugar."
+
 #: ../services/plurk/plurk.keys.in.h:1
 msgid "Plurk"
 msgstr "Plurk"
@@ -139,3 +155,18 @@ msgstr "Youtube"
 msgid "Youtube is a popular video sharing website"
 msgstr "O Youtube é um site popular de compartilhamento de vídeos"
 
+#: ../services/myspace/myspace.keys.in.h:1
+msgid "MySpace"
+msgstr "MySpace"
+
+#: ../services/myspace/myspace.keys.in.h:2
+msgid ""
+"MySpace is a leading social portal for connecting people, content, and "
+"culture from around the world. Create a profile, share photos, professional "
+"and viral videos, blog, instant message your friends, and listen to music on "
+"the world’s largest music community."
+msgstr ""
+"MySpace é um portal social usado para conectar pessoas, conteúdo e cultura "
+"de todo o mundo. Crie um perfil, compartilhe fotos, vídeos virais e "
+"profissionais, blog, mensagens instantâneas e ouça música na maior "
+"comunidade de música do mundo."
