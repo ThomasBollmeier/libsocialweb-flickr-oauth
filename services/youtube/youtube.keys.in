@@ -1,5 +1,5 @@
 [LibSocialWebService]
-_Name=Youtube
+_Name=YouTube
 _Description=Youtube is a popular video sharing website
 Link=http://www.youtube.com
 AuthType=password
