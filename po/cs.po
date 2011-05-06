@@ -4,10 +4,10 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: \n"
+"Project-Id-Version: libsocialweb\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-03-09 23:30+0000\n"
-"PO-Revision-Date: 2011-03-12 16:25+0100\n"
+"POT-Creation-Date: 2011-05-05 19:28+0000\n"
+"PO-Revision-Date: 2011-05-06 08:06+0200\n"
 "Last-Translator: Marek Černocký <marek@manet.cz>\n"
 "Language-Team: Czech <gnome-cs-list@gnome.org>\n"
 "MIME-Version: 1.0\n"
@@ -77,7 +77,7 @@ msgstr ""
 "zapálených zákazníků."
 
 #. This format is for tweets announcing twitpic URLs, "[tweet] [url]".
-#: ../services/twitter/twitter.c:772
+#: ../services/twitter/twitter.c:829
 #, c-format
 msgid "%s %s"
 msgstr "%s %s"
@@ -148,29 +148,27 @@ msgid "Sina microblogging"
 msgstr "Mikroblogovací služba Sina."
 
 #: ../services/youtube/youtube.keys.in.h:1
-msgid "Youtube"
-msgstr "Youtube"
+#| msgid "Youtube"
+msgid "YouTube"
+msgstr "YouTube"
 
 #: ../services/youtube/youtube.keys.in.h:2
 msgid "Youtube is a popular video sharing website"
 msgstr "Youtube je populární webový server pro sdílení videí."
 
-#~ msgid "MySpace"
-#~ msgstr "MySpace"
+#: ../services/myspace/myspace.keys.in.h:1
+msgid "MySpace"
+msgstr "MySpace"
 
-#~ msgid ""
-#~ "MySpace is a leading social portal for connecting people, content, and "
-#~ "culture from around the world. Create a profile, share photos, "
-#~ "professional and viral videos, blog, instant message your friends, and "
-#~ "listen to music on the world’s largest music community."
-#~ msgstr ""
-#~ "MySpace je vedoucí společenskou sítí, která dohromady spojuje lidi, obsah "
-#~ "a kultury z celého světa. Vytvořte profil, zveřejňujte fotografie, videa, "
-#~ "pište záznamy do svého deníku, povídejte si se svými přáteli a "
-#~ "poslouchejte hudbu v největším hudebním společenství."
+#: ../services/myspace/myspace.keys.in.h:2
+msgid ""
+"MySpace is a leading social portal for connecting people, content, and "
+"culture from around the world. Create a profile, share photos, professional "
+"and viral videos, blog, instant message your friends, and listen to music on "
+"the world’s largest music community."
+msgstr ""
+"MySpace je vedoucí společenskou sítí, která dohromady spojuje lidi, obsah a "
+"kultury z celého světa. Vytvořte profil, zveřejňujte fotografie, videa, "
+"pište záznamy do svého deníku, povídejte si se svými přáteli a poslouchejte "
+"hudbu v největším hudebním společenství."
 
-#~ msgid "Digg"
-#~ msgstr "Digg"
-
-#~ msgid "Digg - to share news, video and images"
-#~ msgstr "Digg - pro sdílení zpráv, videí a obrázků"
