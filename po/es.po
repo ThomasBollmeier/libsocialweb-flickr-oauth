@@ -5,8 +5,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-03-09 23:30+0000\n"
-"PO-Revision-Date: 2011-03-10 15:11+0100\n"
+"POT-Creation-Date: 2011-05-05 19:28+0000\n"
+"PO-Revision-Date: 2011-05-07 12:32+0200\n"
 "Last-Translator: Daniel Mustieles <daniel.mustieles@gmail.com>\n"
 "Language-Team: Español <gnome-es-list@gnome.org>\n"
 "MIME-Version: 1.0\n"
@@ -82,7 +82,7 @@ msgstr ""
 "apasionados."
 
 #. This format is for tweets announcing twitpic URLs, "[tweet] [url]".
-#: ../services/twitter/twitter.c:772
+#: ../services/twitter/twitter.c:829
 #, c-format
 msgid "%s %s"
 msgstr "%s %s"
@@ -153,31 +153,33 @@ msgid "Sina microblogging"
 msgstr "Microblogging Sina"
 
 #: ../services/youtube/youtube.keys.in.h:1
-msgid "Youtube"
-msgstr "Youtube"
+#| msgid "Youtube"
+msgid "YouTube"
+msgstr "YouTube"
 
 #: ../services/youtube/youtube.keys.in.h:2
 msgid "Youtube is a popular video sharing website"
 msgstr "Youtube es un sitio web popular para compartir vídeos"
 
-#~ msgid "MySpace"
-#~ msgstr "MySpace"
+#: ../services/myspace/myspace.keys.in.h:1
+msgid "MySpace"
+msgstr "MySpace"
 
 # MySpace is one of the main social portals to connect people and cultures of
 # the whole world. Create a profile, share your photos, your videos
 # (professional or viral) or your blogs, send instant messages to friends and
 # listen to music in the largest musical community in the world.
-#~ msgid ""
-#~ "MySpace is a leading social portal for connecting people, content, and "
-#~ "culture from around the world. Create a profile, share photos, "
-#~ "professional and viral videos, blog, instant message your friends, and "
-#~ "listen to music on the world’s largest music community."
-#~ msgstr ""
-#~ "MySpace es uno de los principales portales sociales para conectar a la "
-#~ "gente y a las culturas de todo el mundo. Crea un perfil, comparte tus "
-#~ "fotos, tus videos (profesionales y virales) o tus blogs, envía mensajes "
-#~ "instantáneos a tus amigos, y escucha música en la mayor comunidad musical "
-#~ "del mundo."
+#: ../services/myspace/myspace.keys.in.h:2
+msgid ""
+"MySpace is a leading social portal for connecting people, content, and "
+"culture from around the world. Create a profile, share photos, professional "
+"and viral videos, blog, instant message your friends, and listen to music on "
+"the world’s largest music community."
+msgstr ""
+"MySpace es uno de los principales portales sociales para conectar a la gente "
+"y a las culturas de todo el mundo. Crea un perfil, comparte tus fotos, tus "
+"videos (profesionales y virales) o tus blogs, envía mensajes instantáneos a "
+"tus amigos, y escucha música en la mayor comunidad musical del mundo."
 
 #~ msgid "Digg"
 #~ msgstr "Digg"
