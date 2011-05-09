@@ -8,8 +8,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: libsocialweb\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-04-22 12:52+0200\n"
-"PO-Revision-Date: 2011-04-22 13:01+0200\n"
+"POT-Creation-Date: 2011-05-09 13:53+0200\n"
+"PO-Revision-Date: 2011-05-09 13:54+0200\n"
 "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
 "Language-Team: Polish <gnomepl@aviary.pl>\n"
 "Language: pl\n"
@@ -44,13 +44,11 @@ msgstr ""
 
 #. Translators "[track title] by [artist]"
 #: ../services/lastfm/lastfm-item-view.c:361
-#: ../services/lastfm/lastfm-contact-view.c:356
 #, c-format
 msgid "%s by %s"
 msgstr "%s w wykonaniu %s"
 
 #: ../services/lastfm/lastfm-item-view.c:365
-#: ../services/lastfm/lastfm-contact-view.c:360
 msgid "Unknown"
 msgstr "Nieznany"
 
@@ -149,7 +147,7 @@ msgid "Sina microblogging"
 msgstr "Mikroblogi Sina"
 
 #: ../services/youtube/youtube.keys.in.h:1
-msgid "Youtube"
+msgid "YouTube"
 msgstr "YouTube"
 
 #: ../services/youtube/youtube.keys.in.h:2
