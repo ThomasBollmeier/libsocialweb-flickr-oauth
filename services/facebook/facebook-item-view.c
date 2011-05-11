@@ -263,6 +263,11 @@ _facebook_status_node_to_item (SwItemView *self,
                                    FB_PICTURE_SIZE_SQUARE);
       sw_item_request_image_fetch (item, FALSE, "authoricon", pic_url);
       g_free (pic_url);
+
+      pic_url = build_picture_url (priv->proxy, authorid,
+                                   FB_PICTURE_SIZE_LARGE);
+      sw_item_request_image_fetch (item, FALSE, "authoricon_large", pic_url);
+      g_free (pic_url);
     }
 
   /* thumbnail is not likely to exist on a status update, but just in case */
