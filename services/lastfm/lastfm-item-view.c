@@ -411,6 +411,10 @@ make_item (SwLastfmItemView *item_view,
   if (s)
     sw_item_request_image_fetch (item, FALSE, "authoricon", s);
 
+  s = get_image_url (user, "large");
+  if (s)
+    sw_item_request_image_fetch (item, FALSE, "authoricon_large", s);
+
   return item;
 }
 
