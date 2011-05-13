@@ -5,7 +5,6 @@ libflickr_la_SOURCES = module.c \
 		       flickr-contact-view.c flickr-contact-view.h
 libflickr_la_CFLAGS = -I$(top_srcdir) \
 		      $(REST_CFLAGS) \
-		      $(GCONF_CFLAGS) \
 		      $(SOUP_CFLAGS) \
 		      $(DBUS_GLIB_CFLAGS) \
 		      $(GCOV_CFLAGS)
@@ -14,7 +13,6 @@ libflickr_la_LIBADD = $(top_builddir)/libsocialweb/libsocialweb.la \
 		      $(top_builddir)/libsocialweb-keyfob/libsocialweb-keyfob.la \
 		      $(top_builddir)/libsocialweb-keystore/libsocialweb-keystore.la \
 		      $(REST_LIBS) \
-		      $(GCONF_LIBS) \
 		      $(SOUP_LIBS) \
 		      $(DBUS_GLIB_LIBS) \
 		      $(GCOV_LDFLAGS)
