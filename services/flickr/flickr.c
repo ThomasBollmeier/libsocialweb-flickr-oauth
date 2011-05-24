@@ -326,9 +326,10 @@ initable_iface_init (gpointer g_iface,
 const static gchar *valid_queries[] = { "feed",
                                         "own",
                                         "friends-only",
-                                        "x-flickr-search" };
+                                        "x-flickr-search",
+                                        NULL };
 
-static const gchar *valid_contact_queries[] = { "people" };
+static const gchar *valid_contact_queries[] = { "people", NULL };
 
 
 static gboolean
@@ -336,7 +337,7 @@ _check_query_validity (const gchar *query, const gchar *list[])
 {
   gint i = 0;
 
-  for (i = 0; i < G_N_ELEMENTS (list); i++)
+  for (i = 0 ; list[i] != NULL ; i++)
   {
     if (g_str_equal (query, list[i]))
       return TRUE;
