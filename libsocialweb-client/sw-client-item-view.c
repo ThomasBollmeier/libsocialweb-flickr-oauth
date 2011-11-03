@@ -55,8 +55,8 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
-#define SW_SERVICE_NAME "com.meego.libsocialweb"
-#define SW_SERVICE_ITEM_VIEW_INTERFACE "com.meego.libsocialweb.ItemView"
+#define SW_SERVICE_NAME "org.gnome.libsocialweb"
+#define SW_SERVICE_ITEM_VIEW_INTERFACE "org.gnome.libsocialweb.ItemView"
 
 static void
 sw_client_item_view_get_property (GObject *object, guint property_id,
@@ -479,7 +479,7 @@ sw_client_item_view_start (SwClientItemView *item_view)
 {
   SwClientItemViewPrivate *priv = GET_PRIVATE (item_view);
 
-  com_meego_libsocialweb_ItemView_start_async (priv->proxy,
+  org_gnome_libsocialweb_ItemView_start_async (priv->proxy,
                                                _sw_client_item_view_generic_cb,
                                                (gpointer)G_STRFUNC);
 }
@@ -489,7 +489,7 @@ sw_client_item_view_refresh (SwClientItemView *item_view)
 {
   SwClientItemViewPrivate *priv = GET_PRIVATE (item_view);
 
-  com_meego_libsocialweb_ItemView_refresh_async (priv->proxy,
+  org_gnome_libsocialweb_ItemView_refresh_async (priv->proxy,
                                                  _sw_client_item_view_generic_cb,
                                                  (gpointer)G_STRFUNC);
 }
@@ -499,7 +499,7 @@ sw_client_item_view_stop (SwClientItemView *item_view)
 {
   SwClientItemViewPrivate *priv = GET_PRIVATE (item_view);
 
-  com_meego_libsocialweb_ItemView_stop_async (priv->proxy,
+  org_gnome_libsocialweb_ItemView_stop_async (priv->proxy,
                                               _sw_client_item_view_generic_cb,
                                               (gpointer)G_STRFUNC);
 }
@@ -509,7 +509,7 @@ sw_client_item_view_close (SwClientItemView *item_view)
 {
   SwClientItemViewPrivate *priv = GET_PRIVATE (item_view);
 
-  com_meego_libsocialweb_ItemView_close_async (priv->proxy,
+  org_gnome_libsocialweb_ItemView_close_async (priv->proxy,
                                               _sw_client_item_view_generic_cb,
                                               (gpointer)G_STRFUNC);
 }

@@ -164,7 +164,7 @@ _make_object_path (SwContactView *contact_view)
   gchar *path;
   static gint count = 0;
 
-  path = g_strdup_printf ("/com/meego/libsocialweb/ContactView%d",
+  path = g_strdup_printf ("/org/gnome/libsocialweb/ContactView%d",
                           count);
 
   count++;

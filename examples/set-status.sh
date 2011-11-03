@@ -12,7 +12,7 @@ shift
 MESSAGE="$@"
 
 dbus-send --session --print-reply \
-    --dest=com.meego.libsocialweb \
-    /com/meego/libsocialweb/Service/$SERVICE \
-    com.meego.libsocialweb.StatusUpdate.UpdateStatus \
+    --dest=org.gnome.libsocialweb \
+    /org/gnome/libsocialweb/Service/$SERVICE \
+    org.gnome.libsocialweb.StatusUpdate.UpdateStatus \
     string:"$MESSAGE" dict:string:string:

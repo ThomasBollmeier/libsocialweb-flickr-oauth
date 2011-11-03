@@ -3,7 +3,7 @@
 <node name="/Collections_Iface"
       xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0"
       xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
-  <interface name="com.meego.libsocialweb.Collections">
+  <interface name="org.gnome.libsocialweb.Collections">
     <doc:doc>
       <doc:summary>An interface representing named collections of
       photos (eg. albums), videos (eg. channels) or both (eg. Flickr sets).

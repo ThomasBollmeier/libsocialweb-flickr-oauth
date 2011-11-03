@@ -23,17 +23,17 @@ from dbus.mainloop.glib import DBusGMainLoop
 DBusGMainLoop(set_as_default=True)
 
 bus = dbus.SessionBus()
-bus.start_service_by_name("com.meego.libsocialweb")
+bus.start_service_by_name("org.gnome.libsocialweb")
 
-service = bus.get_object("com.meego.libsocialweb", "/com/meego/libsocialweb/Service/%s" % sys.argv[1])
+service = bus.get_object("org.gnome.libsocialweb", "/org/gnome/libsocialweb/Service/%s" % sys.argv[1])
 
 if len(sys.argv) > 2:
     query = sys.argv[2]
 else:
     query = "feed"
-path = service.OpenView(query, {}, dbus_interface="com.meego.libsocialweb.Query")
-view = bus.get_object("com.meego.libsocialweb", path)
-view = dbus.Interface(view, "com.meego.libsocialweb.ItemView")
+path = service.OpenView(query, {}, dbus_interface="org.gnome.libsocialweb.Query")
+view = bus.get_object("org.gnome.libsocialweb", path)
+view = dbus.Interface(view, "org.gnome.libsocialweb.ItemView")
 
 def now():
     return time.strftime("%T", time.localtime())

@@ -109,7 +109,7 @@ sw_service_class_init (SwServiceClass *klass)
   object_class->constructed = sw_service_constructed;
 
   dbus_g_error_domain_register (SW_SERVICE_ERROR,
-                                "com.meego.libsocialweb.ServiceError",
+                                "org.gnome.libsocialweb.ServiceError",
                                 SW_TYPE_SERVICE_ERROR);
 }
 

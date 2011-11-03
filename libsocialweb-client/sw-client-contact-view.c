@@ -56,8 +56,8 @@ enum
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
-#define SW_SERVICE_NAME "com.meego.libsocialweb"
-#define SW_SERVICE_CONTACT_VIEW_INTERFACE "com.meego.libsocialweb.ContactView"
+#define SW_SERVICE_NAME "org.gnome.libsocialweb"
+#define SW_SERVICE_CONTACT_VIEW_INTERFACE "org.gnome.libsocialweb.ContactView"
 
 static void
 sw_client_contact_view_get_property (GObject *object, guint property_id,
@@ -474,7 +474,7 @@ sw_client_contact_view_start (SwClientContactView *contact_view)
 {
   SwClientContactViewPrivate *priv = GET_PRIVATE (contact_view);
 
-  com_meego_libsocialweb_ContactView_start_async (priv->proxy,
+  org_gnome_libsocialweb_ContactView_start_async (priv->proxy,
                                                _sw_client_contact_view_generic_cb,
                                                (gpointer)G_STRFUNC);
 }
@@ -484,7 +484,7 @@ sw_client_contact_view_refresh (SwClientContactView *contact_view)
 {
   SwClientContactViewPrivate *priv = GET_PRIVATE (contact_view);
 
-  com_meego_libsocialweb_ContactView_refresh_async (priv->proxy,
+  org_gnome_libsocialweb_ContactView_refresh_async (priv->proxy,
                                                  _sw_client_contact_view_generic_cb,
                                                  (gpointer)G_STRFUNC);
 }
@@ -494,7 +494,7 @@ sw_client_contact_view_stop (SwClientContactView *contact_view)
 {
   SwClientContactViewPrivate *priv = GET_PRIVATE (contact_view);
 
-  com_meego_libsocialweb_ContactView_stop_async (priv->proxy,
+  org_gnome_libsocialweb_ContactView_stop_async (priv->proxy,
                                               _sw_client_contact_view_generic_cb,
                                               (gpointer)G_STRFUNC);
 }
@@ -504,7 +504,7 @@ sw_client_contact_view_close (SwClientContactView *contact_view)
 {
   SwClientContactViewPrivate *priv = GET_PRIVATE (contact_view);
 
-  com_meego_libsocialweb_ContactView_close_async (priv->proxy,
+  org_gnome_libsocialweb_ContactView_close_async (priv->proxy,
                                               _sw_client_contact_view_generic_cb,
                                               (gpointer)G_STRFUNC);
 }

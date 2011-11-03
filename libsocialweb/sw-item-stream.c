@@ -140,7 +140,7 @@ _make_object_path (SwItemStream *item_stream)
   gchar *path;
   static gint count = 0;
 
-  path = g_strdup_printf ("/com/meego/libsocialweb/Stream%d",
+  path = g_strdup_printf ("/org/gnome/libsocialweb/Stream%d",
                           count);
 
   count++;

@@ -2,7 +2,7 @@
 <node name="/Banishable_Iface"
       xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0"
       xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
-  <interface name="com.meego.libsocialweb.Banishable">
+  <interface name="org.gnome.libsocialweb.Banishable">
     <doc:doc>
       <doc:summary>An interface for hiding items from a feed from a service.</doc:summary>
     </doc:doc>

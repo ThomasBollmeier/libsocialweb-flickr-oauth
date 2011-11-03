@@ -71,20 +71,20 @@ struct _SwClientServicePrivate {
 };
 
 static const gchar *interface_names[LAST_IFACE] = {
-  "com.meego.libsocialweb.Service",
-  "com.meego.libsocialweb.Avatar",
-  "com.meego.libsocialweb.Query",
-  "com.meego.libsocialweb.ContactsQuery",
-  "com.meego.libsocialweb.StatusUpdate",
-  "com.meego.libsocialweb.Banishable",
-  "com.meego.libsocialweb.PhotoUpload",
-  "com.meego.libsocialweb.VideoUpload"
+  "org.gnome.libsocialweb.Service",
+  "org.gnome.libsocialweb.Avatar",
+  "org.gnome.libsocialweb.Query",
+  "org.gnome.libsocialweb.ContactsQuery",
+  "org.gnome.libsocialweb.StatusUpdate",
+  "org.gnome.libsocialweb.Banishable",
+  "org.gnome.libsocialweb.PhotoUpload",
+  "org.gnome.libsocialweb.VideoUpload"
 };
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
-#define SW_CLIENT_SERVICE_NAME "com.meego.libsocialweb"
-#define SW_CLIENT_SERVICE_OBJECT "/com/meego/libsocialweb/Service/%s"
+#define SW_CLIENT_SERVICE_NAME "org.gnome.libsocialweb"
+#define SW_CLIENT_SERVICE_OBJECT "/org/gnome/libsocialweb/Service/%s"
 
 #define SW_CLIENT_SERVICE_ERROR sw_client_service_error_quark()
 static GQuark
@@ -458,7 +458,7 @@ sw_client_service_get_static_capabilities (SwClientService                      
   closure->cb = (GCallback)cb;
   closure->userdata = userdata;
 
-  com_meego_libsocialweb_Service_get_static_capabilities_async (priv->proxies[SERVICE_IFACE],
+  org_gnome_libsocialweb_Service_get_static_capabilities_async (priv->proxies[SERVICE_IFACE],
                                                                  _get_capabilities_cb,
                                                                  closure);
 }
@@ -482,7 +482,7 @@ sw_client_service_get_dynamic_capabilities (SwClientService                     
   closure->cb = (GCallback)cb;
   closure->userdata = userdata;
 
-  com_meego_libsocialweb_Service_get_dynamic_capabilities_async (priv->proxies[SERVICE_IFACE],
+  org_gnome_libsocialweb_Service_get_dynamic_capabilities_async (priv->proxies[SERVICE_IFACE],
                                                                   _get_capabilities_cb,
                                                                   closure);
 }
@@ -569,7 +569,7 @@ sw_client_service_update_status_with_fields (SwClientService                    
   closure->cb = (GCallback)cb;
   closure->userdata = userdata;
 
-  com_meego_libsocialweb_StatusUpdate_update_status_async (priv->proxies[STATUS_UPDATE_IFACE],
+  org_gnome_libsocialweb_StatusUpdate_update_status_async (priv->proxies[STATUS_UPDATE_IFACE],
                                                             status_msg,
                                                             fields,
                                                             _update_status_cb,
@@ -683,13 +683,13 @@ got_file_size_cb (GObject *source_object,
 
   filename = g_file_get_path (G_FILE (source_object));
   if (closure->iface == PHOTO_UPLOAD_IFACE) {
-    com_meego_libsocialweb_PhotoUpload_upload_photo_async (priv->proxies[PHOTO_UPLOAD_IFACE],
+    org_gnome_libsocialweb_PhotoUpload_upload_photo_async (priv->proxies[PHOTO_UPLOAD_IFACE],
                                                            filename,
                                                            closure->fields,
                                                            _upload_file_cb,
                                                            closure);
   } else {
-    com_meego_libsocialweb_VideoUpload_upload_video_async (priv->proxies[VIDEO_UPLOAD_IFACE],
+    org_gnome_libsocialweb_VideoUpload_upload_video_async (priv->proxies[VIDEO_UPLOAD_IFACE],
                                                            filename,
                                                            closure->fields,
                                                            _upload_file_cb,
@@ -872,7 +872,7 @@ sw_client_service_request_avatar (SwClientService *service)
 {
   SwClientServicePrivate *priv = GET_PRIVATE (service);
 
-  com_meego_libsocialweb_Avatar_request_avatar_async (priv->proxies[AVATAR_IFACE],
+  org_gnome_libsocialweb_Avatar_request_avatar_async (priv->proxies[AVATAR_IFACE],
                                                        _request_avatar_cb,
                                                        NULL);
 }
@@ -888,7 +888,7 @@ sw_client_service_credentials_updated (SwClientService *service)
 {
   SwClientServicePrivate *priv = GET_PRIVATE (service);
 
-  com_meego_libsocialweb_Service_credentials_updated_async (priv->proxies[SERVICE_IFACE],
+  org_gnome_libsocialweb_Service_credentials_updated_async (priv->proxies[SERVICE_IFACE],
                                                              _credentials_updated_cb,
                                                              NULL);
 }
@@ -980,7 +980,7 @@ sw_client_service_query_open_view (SwClientService                      *service
     params = tmp_params;
   }
 
-  com_meego_libsocialweb_Query_open_view_async (priv->proxies [QUERY_IFACE],
+  org_gnome_libsocialweb_Query_open_view_async (priv->proxies [QUERY_IFACE],
                                                  query,
                                                  params,
                                                  _query_open_view_cb,
@@ -1071,7 +1071,7 @@ sw_client_service_contacts_query_open_view (SwClientService        *service,
     params = tmp_params;
   }
 
-  com_meego_libsocialweb_ContactsQuery_open_view_async
+  org_gnome_libsocialweb_ContactsQuery_open_view_async
           (priv->proxies [CONTACTS_QUERY_IFACE],
            query,
            params,
@@ -1163,7 +1163,7 @@ sw_client_service_banishable_hide_item (SwClientService *service,
     return;
   }
 
-  com_meego_libsocialweb_Banishable_hide_item_async (priv->proxies[BANISHABLE_IFACE],
+  org_gnome_libsocialweb_Banishable_hide_item_async (priv->proxies[BANISHABLE_IFACE],
                                                       uid,
                                                       NULL,
                                                       NULL);

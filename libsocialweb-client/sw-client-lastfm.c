@@ -35,8 +35,8 @@ struct _SwClientLastfmPrivate {
     DBusGProxy *proxy;
 };
 
-#define SW_SERVICE_NAME "com.meego.libsocialweb"
-#define SW_SERVICE_LASTFM_INTERFACE "com.meego.libsocialweb.Service.Lastfm"
+#define SW_SERVICE_NAME "org.gnome.libsocialweb"
+#define SW_SERVICE_LASTFM_INTERFACE "org.gnome.libsocialweb.Service.Lastfm"
 
 static void
 sw_client_lastfm_dispose (GObject *object)
@@ -92,7 +92,7 @@ sw_client_lastfm_constructed (GObject *object)
 
   priv->proxy = dbus_g_proxy_new_for_name_owner (priv->connection,
                                                  SW_SERVICE_NAME,
-                                                 "/com/meego/libsocialweb/Service/twitter",
+                                                 "/org/gnome/libsocialweb/Service/twitter",
                                                  SW_SERVICE_LASTFM_INTERFACE,
                                                  &error);
 
@@ -151,7 +151,7 @@ sw_client_lastfm_now_playing (SwClientLastfm *lastfm,
 {
   SwClientLastfmPrivate *priv = GET_PRIVATE (lastfm);
 
-  com_meego_libsocialweb_Service_Lastfm_now_playing_async (priv->proxy, artist,
+  org_gnome_libsocialweb_Service_Lastfm_now_playing_async (priv->proxy, artist,
                                                      album, track,
                                                      length, tracknumber,
                                                      musicbrainz_id,
@@ -186,7 +186,7 @@ sw_client_lastfm_submit_track (SwClientLastfm *lastfm,
 {
   SwClientLastfmPrivate *priv = GET_PRIVATE (lastfm);
 
-  com_meego_libsocialweb_Service_Lastfm_submit_track_async (priv->proxy, artist,
+  org_gnome_libsocialweb_Service_Lastfm_submit_track_async (priv->proxy, artist,
                                                       album, track,
                                                       time, source, rating,
                                                       length, tracknumber,
