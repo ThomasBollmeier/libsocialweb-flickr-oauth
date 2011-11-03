@@ -213,7 +213,7 @@ online_notify (gboolean online, gpointer user_data)
                                   "Email", priv->username,
                                   "Passwd", priv->password,
                                   "service", "youtube",
-                                  "source", "SUSE MeeGo",
+                                  "source", "libsocialweb",
                                   NULL);
       rest_proxy_call_add_header (call,
                                   "Content-Type",
