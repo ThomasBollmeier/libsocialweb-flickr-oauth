@@ -289,3 +289,32 @@ sw_service_map_params (const ParameterNameMapping *mapping,
   }
 
 }
+
+static const gchar *no_caps[] = { NULL, };
+
+const char **
+sw_service_get_dynamic_caps (SwService *service)
+{
+  SwServiceClass *service_class;
+
+  service_class = SW_SERVICE_GET_CLASS (service);
+
+  if (service_class->get_dynamic_caps)
+    return service_class->get_dynamic_caps (service);
+  else
+    return no_caps;
+}
+
+const char **
+sw_service_get_static_caps (SwService *service)
+{
+  SwServiceClass *service_class;
+
+  service_class = SW_SERVICE_GET_CLASS (service);
+
+  if (service_class->get_static_caps)
+    return service_class->get_static_caps (service);
+  else
+    return no_caps;
+}
+

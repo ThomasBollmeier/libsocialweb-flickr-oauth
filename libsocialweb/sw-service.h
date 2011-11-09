@@ -129,6 +129,9 @@ void sw_service_map_params (const ParameterNameMapping *mapping,
                             SwServiceSetParamFunc       set_param_func,
                             gpointer                    remote_call_object);
 
+const char **sw_service_get_dynamic_caps (SwService *service);
+const char **sw_service_get_static_caps (SwService *service);
+
 G_END_DECLS
 
 #endif /* _SW_SERVICE */
