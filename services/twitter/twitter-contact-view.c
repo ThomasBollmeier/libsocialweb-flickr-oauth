@@ -332,7 +332,6 @@ _got_ids_cb (RestProxyCall *call,
   SwTwitterContactView *contact_view = SW_TWITTER_CONTACT_VIEW (weak_object);
   SwTwitterContactViewPrivate *priv = GET_PRIVATE (contact_view);
   RestXmlNode *root, *node;
-  SwService *service;
   char *ids;
   int i;
 
@@ -349,8 +348,6 @@ _got_ids_cb (RestProxyCall *call,
     return;
 
   SW_DEBUG (TWITTER, "Got ids!");
-
-  service = sw_contact_view_get_service (SW_CONTACT_VIEW (contact_view));
 
   i = 0;
   ids = NULL;
