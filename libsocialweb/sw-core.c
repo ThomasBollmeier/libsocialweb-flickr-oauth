@@ -152,7 +152,7 @@ load_module (SwCore *core, const char *file)
 
     if (G_IS_INITABLE (service)) {
       if (!g_initable_init (G_INITABLE (service), NULL, &error)) {
-        g_message ("Cannot import %s: %s", service_name, error->message);
+        g_message (G_STRLOC ": Cannot load %s: %s", service_name, error->message);
         g_error_free (error);
         g_object_unref (service);
         return;
