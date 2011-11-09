@@ -398,6 +398,10 @@ _get_ids (SwTwitterContactView *contact_view)
   SwService *service;
   const char *username;
 
+  service = sw_contact_view_get_service (SW_CONTACT_VIEW (contact_view));
+  if (!sw_service_has_dynamic_cap (service, CREDENTIALS_VALID))
+    return;
+
   call = rest_proxy_new_call (priv->proxy);
 
   if (g_str_equal (priv->query, "people"))
