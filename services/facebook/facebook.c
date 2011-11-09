@@ -419,17 +419,26 @@ sw_service_facebook_initable (GInitable     *initable,
                                      NULL);
 
   if (auth_url == NULL) {
-    g_warning ("Auth URL not found in keys file");
+    g_set_error_literal (error,
+                         SW_SERVICE_ERROR,
+                         SW_SERVICE_ERROR_INCOMPLETE_KEY_FILE,
+                         "Auth URL not found in keys file");
     goto out;
   }
 
   if (graph_url == NULL) {
-    g_warning ("Graph URL not found in keys file");
+    g_set_error_literal (error,
+                         SW_SERVICE_ERROR,
+                         SW_SERVICE_ERROR_INCOMPLETE_KEY_FILE,
+                         "Graph URL not found in keys file");
     goto out;
   }
 
   if (video_url == NULL) {
-    g_warning ("Video upload URL not found in keys file");
+    g_set_error_literal (error,
+                         SW_SERVICE_ERROR,
+                         SW_SERVICE_ERROR_INCOMPLETE_KEY_FILE,
+                         "Video upload URL not found in keys file");
     goto out;
   }
 
