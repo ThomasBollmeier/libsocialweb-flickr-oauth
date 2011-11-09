@@ -498,6 +498,11 @@ _get_status_updates (SwTwitterItemView *item_view)
 {
   SwTwitterItemViewPrivate *priv = GET_PRIVATE (item_view);
   RestProxyCall *call;
+  SwService *service;
+
+  service = sw_item_view_get_service (SW_ITEM_VIEW (item_view));
+  if (!sw_service_has_dynamic_cap (service, CREDENTIALS_VALID))
+    return;
 
   call = rest_proxy_new_call (priv->proxy);
 
