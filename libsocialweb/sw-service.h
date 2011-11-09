@@ -132,6 +132,8 @@ void sw_service_map_params (const ParameterNameMapping *mapping,
 const char **sw_service_get_dynamic_caps (SwService *service);
 const char **sw_service_get_static_caps (SwService *service);
 
+gboolean sw_service_has_dynamic_cap (SwService *service, const gchar *cap);
+
 G_END_DECLS
 
 #endif /* _SW_SERVICE */

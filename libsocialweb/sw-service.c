@@ -318,3 +318,12 @@ sw_service_get_static_caps (SwService *service)
     return no_caps;
 }
 
+gboolean
+sw_service_has_dynamic_cap (SwService *service, const gchar *cap)
+{
+  const gchar **caps;
+
+  caps = sw_service_get_dynamic_caps (service);
+
+  return sw_service_has_cap (caps, cap);
+}
