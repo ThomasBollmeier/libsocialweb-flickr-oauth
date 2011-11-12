@@ -303,6 +303,11 @@ _get_status_updates (SwVimeoItemView *item_view)
 {
   SwVimeoItemViewPrivate *priv = GET_PRIVATE (item_view);
   RestProxyCall *call;
+  SwService *service;
+
+  service = sw_item_view_get_service (SW_ITEM_VIEW (item_view));
+  if (!sw_service_has_dynamic_cap (service, CREDENTIALS_VALID))
+    return;
 
   sw_call_list_cancel_all (priv->calls);
   sw_set_empty (priv->set);
