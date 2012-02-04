@@ -35,7 +35,6 @@
 #include <libsocialweb/sw-client-monitor.h>
 
 #include <rest/oauth-proxy.h>
-#include <rest/rest-xml-parser.h>
 
 #include <interfaces/sw-contacts-query-ginterface.h>
 #include <interfaces/sw-query-ginterface.h>
@@ -45,8 +44,8 @@
 #include "flickr-item-view.h"
 #include "flickr-contact-view.h"
 #include "flickr.h"
+#include "flickr-auth-manager.h"
 
-#define FLICKR_OAUTH_URL "http://www.flickr.com/services/oauth/"
 #define FLICKR_REST_API_URL "http://api.flickr.com/services/rest/"
 
 static void initable_iface_init (gpointer g_iface, gpointer iface_data);
@@ -72,6 +71,7 @@ G_DEFINE_TYPE_WITH_CODE (SwServiceFlickr, sw_service_flickr, SW_TYPE_SERVICE,
 
 struct _SwServiceFlickrPrivate {
   RestProxy *proxy;
+  FlickrAuthManager *auth_manager; /* Helper class to handle authorization process */
   gboolean inited; /* For GInitable */
   gboolean configured; /* Set if we have user tokens */
   gboolean authorised; /* Set if the tokens are valid */
@@ -139,147 +139,25 @@ get_dynamic_caps (SwService *service)
   }
 }
 
-static RestXmlNode *
-node_from_call (RestProxyCall *call)
-{
-  static RestXmlParser *parser = NULL;
-  RestXmlNode *node;
-
-  if (call == NULL)
-    return NULL;
-
-  if (parser == NULL)
-    parser = rest_xml_parser_new ();
-
-  if (!SOUP_STATUS_IS_SUCCESSFUL (rest_proxy_call_get_status_code (call))) {
-    g_warning (G_STRLOC ": error from Flickr: %s (%d)",
-               rest_proxy_call_get_status_message (call),
-               rest_proxy_call_get_status_code (call));
-    return NULL;
-  }
-
-  node = rest_xml_parser_parse_from_data (parser,
-                                          rest_proxy_call_get_payload (call),
-                                          rest_proxy_call_get_payload_length (call));
-  g_object_unref (call);
-
-  /* Invalid XML, or incorrect root */
-  if (node == NULL || !g_str_equal (node->name, "rsp")) {
-    g_warning (G_STRLOC ": cannot make Flickr call");
-    /* TODO: display the payload if its short */
-    if (node) rest_xml_node_unref (node);
-    return NULL;
-  }
-
-  if (g_strcmp0 (rest_xml_node_get_attr (node, "stat"), "ok") != 0) {
-    RestXmlNode *err;
-    err = rest_xml_node_find (node, "err");
-    if (err)
-      g_warning (G_STRLOC ": cannot make Flickr call: %s",
-                 rest_xml_node_get_attr (err, "msg"));
-    rest_xml_node_unref (node);
-    return NULL;
-  }
-  
-  /* TODO: check permissions as well (we could have been granted read access only) */
-
-  return node;
-}
-
 static void
-check_tokens_cb (RestProxyCall *call,
-                 const GError  *error,
-                 GObject       *weak_object,
-                 gpointer       user_data)
+on_proxy_checked (gboolean token_valid,
+                  const GError *validation_error,
+                  OAuthProxy *proxy,
+                  gpointer user_data)
 {
-  SwService *service = SW_SERVICE (weak_object);
-  SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
-  RestXmlNode *root;
 
-  root = node_from_call (call);
-  if (root) {
+  SwServiceFlickr *self = SW_SERVICE_FLICKR (user_data);
+  
+  self->priv->authorised = token_valid;
+
+  if (token_valid) {
     SW_DEBUG (FLICKR, "checkToken: authorised");
-    priv->authorised = TRUE;
-    rest_xml_node_unref (root);
   } else {
     SW_DEBUG (FLICKR, "checkToken: invalid token");
-    priv->authorised = FALSE;
   }
 
-  sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
-  
-  g_object_unref (call);
-}
-
-static gchar *
-_sw_service_flickr_sign_token_check (const gchar *consumer_key,
-                                     const gchar *consumer_secret,
-                                     const gchar *token)
-{
-  
-  GChecksum *checksum = g_checksum_new(G_CHECKSUM_MD5);
-  gchar *md5_signature;
-  
-  /* Add shared secret and name-value pairs in alphabetical order: */
-  g_checksum_update(checksum, (guchar *)consumer_secret, -1);
-  g_checksum_update(checksum, (guchar *)"api_key", -1);
-  g_checksum_update(checksum, (guchar *)consumer_key, -1);
-  g_checksum_update(checksum, (guchar *)"method", -1);
-  g_checksum_update(checksum, (guchar *)"flickr.auth.oauth.checkToken", -1);
-  g_checksum_update(checksum, (guchar *)"oauth_token", -1);
-  g_checksum_update(checksum, (guchar *)token, -1);
-  
-  md5_signature = g_strdup(g_checksum_get_string(checksum));
-  g_checksum_free(checksum);
-  
-  return md5_signature;
-  
-}
-
-static void
-_sw_service_flickr_check_token (SwServiceFlickr *self,
-                                gpointer user_data,
-                                GError **error)
-{
-
-  SwServiceFlickrPriv *priv = GET_PRIVATE(self);
-  gchar *consumer_key;
-  gchar *consumer_secret;
-  gchar *token;
-  RestProxy *proxy;
-  RestProxyCall *call;
-  const gboolean NO_BINDING = FALSE;
-  gchar *signature;
-  
-  g_object_get (G_OBJECT (priv->proxy),
-                "consumer-key", &consumer_key,
-                "consumer-secret", &consumer_secret,
-                "token", &token,
-                NULL);
-
-  proxy = rest_proxy_new (FLICKR_REST_API_URL, NO_BINDING);
-  call = rest_proxy_new_call (proxy);
-  rest_proxy_call_add_params (call,
-                              "method", "flickr.auth.oauth.checkToken",
-                              "api_key", api_key,
-                              "oauth_token", token,
-                              NULL);
-  signature = _sw_service_flickr_sign_token_check (consumer_key,
-                                                   consumer_secret,
-                                                   token);
-  rest_proxy_call_add_param(call, "api_sig", signature);
-  g_free(signature);
-
-  rest_proxy_call_async(call,
-                        check_tokens_cb,
-                        G_OBJECT(self),
-                        user_data,
-                        error);
-  
-  g_object_unref (proxy);
-  g_free (consumer_key);
-  g_free (consumer_secret);
-  g_free (token);
+  sw_service_emit_capabilities_changed (SW_SERVICE (self),
+                                        get_dynamic_caps (SW_SERVICE (self)));
   
 }
 
@@ -290,16 +168,21 @@ got_tokens_cb (RestProxy *proxy,
 {
   SwService *service = SW_SERVICE (user_data);
   SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
-  RestProxyCall *call;
-
+  
   SW_DEBUG (FLICKR, "Got tokens: %s", got_tokens ? "yes" : "no");
 
   priv->configured = got_tokens;
   sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
 
   if (got_tokens && sw_is_online ()) {
-    _sw_service_flickr_check_token(SW_SERVICE_FLICKR (user_data), NULL, NULL);
-    /* TODO: error checking */
+    
+    flickr_auth_mgr_check_proxy_async (priv->auth_manager,
+                                       OAUTH_PROXY (proxy),
+                                       on_proxy_checked,
+                                       user_data,
+                                       NULL /* TODO: error handling */
+                                       );
+
   }
 
   /* Drop reference we took for callback */
@@ -349,6 +232,11 @@ static void
 sw_service_flickr_dispose (GObject *object)
 {
   SwServiceFlickrPrivate *priv = SW_SERVICE_FLICKR (object)->priv;
+  
+  if (priv->auth_manager) {
+    g_object_unref (priv->auth_manager);
+    priv->auth_manager = NULL;
+  }
 
   if (priv->proxy) {
     g_object_unref (priv->proxy);
@@ -379,7 +267,8 @@ sw_service_flickr_initable (GInitable    *initable,
                          "No API key configured");
     return FALSE;
   }
-
+  
+  priv->auth_manager = flickr_auth_mgr_new ();
   priv->proxy = oauth_proxy_new (key, secret, FLICKR_REST_API_URL, NO_BINDING);
 
   sw_online_add_notify (online_notify, flickr);
@@ -514,6 +403,23 @@ query_iface_init (gpointer g_iface,
                                       _flickr_query_open_view);
 }
 
+static RestProxyCall *
+_create_upload_call (SwServiceFlickr *self,
+                     const gchar *filename,
+                     GError **error) {
+  
+  /* TODO: implement replacement for flickr_proxy_new_upload_for_file */
+  if (error) {
+    *error = g_error_new (SW_SERVICE_ERROR,
+                          SW_SERVICE_ERROR_NOT_SUPPORTED,
+                          "With deep regret we have to inform you that the upload feature isn't implemented yet."
+                          );
+  }
+
+  return NULL;
+
+}
+
 static gint
 _flickr_upload (SwServiceFlickr              *self,
                 const gchar                  *filename,
@@ -521,15 +427,14 @@ _flickr_upload (SwServiceFlickr              *self,
                 GError                      **error,
                 RestProxyCallUploadCallback   callback)
 {
-  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
   RestProxyCall *call;
   gint opid;
+  GError *err = NULL;
 
-  call = flickr_proxy_new_upload_for_file (FLICKR_PROXY (priv->proxy),
-                                           filename,
-                                           error);
+  call = _create_upload_call (self, filename, &err);
 
-  if (*error != NULL) {
+  if (err) {
+    g_propagate_error (error, err);
     return -1;
   }
 
@@ -671,4 +576,6 @@ sw_service_flickr_init (SwServiceFlickr *self)
   self->priv->inited = FALSE;
   self->priv->configured = FALSE;
   self->priv->authorised = FALSE;
+  self->priv->auth_manager = NULL;
+  self->priv->proxy = NULL;
 }

@@ -35,7 +35,6 @@
 #include <libsocialweb-keyfob/sw-keyfob.h>
 #include <libsocialweb/sw-cache.h>
 
-#include <rest-extras/flickr-proxy.h>
 #include "flickr-contact-view.h"
 #include "flickr.h"
 
@@ -270,7 +269,7 @@ _make_request (SwFlickrContactView *contact_view)
   if (g_str_equal (priv->query, "people"))
   {
     /* http://www.flickr.com/services/api/flickr.contacts.getList.html */
-    rest_proxy_call_set_function (call, "flickr.contacts.getList");
+    rest_proxy_call_add_param (call, "method", "flickr.contacts.getList");
   } else {
     g_error (G_STRLOC ": Unexpected query '%s", priv->query);
   }
@@ -308,9 +307,9 @@ _get_status_updates (SwFlickrContactView *contact_view)
 {
   SwFlickrContactViewPrivate *priv = GET_PRIVATE (contact_view);
 
-  sw_keyfob_flickr ((FlickrProxy *)priv->proxy,
-                    _got_tokens_cb,
-                    g_object_ref (contact_view)); /* ref gets dropped in cb */
+  sw_keyfob_oauth (OAUTH_PROXY (priv->proxy),
+                   _got_tokens_cb,
+                   g_object_ref (contact_view)); /* ref gets dropped in cb */
 }
 
 static gboolean

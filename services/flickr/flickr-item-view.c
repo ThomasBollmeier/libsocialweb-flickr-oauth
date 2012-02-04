@@ -33,7 +33,6 @@
 #include <libsocialweb-keyfob/sw-keyfob.h>
 #include <libsocialweb/sw-cache.h>
 
-#include <rest-extras/flickr-proxy.h>
 #include "flickr-item-view.h"
 #include "flickr.h"
 
@@ -341,7 +340,7 @@ _make_request (SwFlickrItemView *item_view)
   if (g_str_equal (priv->query, "x-flickr-search"))
   {
     /* http://www.flickr.com/services/api/flickr.photos.search.html */
-    rest_proxy_call_set_function (call, "flickr.photos.search");
+    rest_proxy_call_add_param (call, "method", "flickr.photos.search");
 
     if (g_hash_table_lookup (priv->params, "text"))
       rest_proxy_call_add_param (call, "text", g_hash_table_lookup (priv->params, "text"));
@@ -357,7 +356,7 @@ _make_request (SwFlickrItemView *item_view)
   } else if (g_str_equal (priv->query, "own")) {
 
     /* http://www.flickr.com/services/api/flickr.people.getPhotos.html */
-    rest_proxy_call_set_function (call, "flickr.people.getPhotos");
+    rest_proxy_call_add_param (call, "method", "flickr.people.getPhotos");
     rest_proxy_call_add_param (call, "user_id", "me");
 
   } else if (g_str_equal (priv->query, "friends-only") || 
@@ -365,7 +364,7 @@ _make_request (SwFlickrItemView *item_view)
     /* 
      * http://www.flickr.com/services/api/flickr.photos.getContactsPhotos.html
      * */
-    rest_proxy_call_set_function (call, "flickr.photos.getContactsPhotos");
+    rest_proxy_call_add_param (call, "method", "flickr.photos.getContactsPhotos");
 
     if (g_str_equal (priv->query, "friends-only"))
     {
@@ -414,9 +413,9 @@ _get_status_updates (SwFlickrItemView *item_view)
 {
   SwFlickrItemViewPrivate *priv = GET_PRIVATE (item_view);
 
-  sw_keyfob_flickr ((FlickrProxy *)priv->proxy,
-                    _got_tokens_cb,
-                    g_object_ref (item_view)); /* ref gets dropped in cb */
+  sw_keyfob_oauth (OAUTH_PROXY (priv->proxy),
+                   _got_tokens_cb,
+                   g_object_ref (item_view)); /* ref gets dropped in cb */
 }
 
 static gboolean
