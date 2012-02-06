@@ -25,17 +25,13 @@
 #include "glib-object.h"
 
 G_BEGIN_DECLS
-
 #define FLICKR_AUTH_ERROR g_quark_from_static_string("flickr_auth_error_quark")
+  enum FlickrAuthError
+{
 
-enum FlickrAuthError {
-    
-    FLICKR_AUTH_ERROR_INVALID_URL_FORMAT = 1,
-    FLICKR_AUTH_ERROR_FLICKR_ERROR
-    
+  FLICKR_AUTH_ERROR_INVALID_URL_FORMAT = 1,
+  FLICKR_AUTH_ERROR_FLICKR_ERROR
 };
 
 G_END_DECLS
-
 #endif
-

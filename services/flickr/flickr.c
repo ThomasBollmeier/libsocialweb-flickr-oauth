@@ -47,6 +47,7 @@
 #include "flickr-auth-manager.h"
 
 #define FLICKR_REST_API_URL "http://api.flickr.com/services/rest/"
+#define FLICKR_UPLOAD_URL "http://api.flickr.com/services/upload/"
 
 static void initable_iface_init (gpointer g_iface, gpointer iface_data);
 static void contacts_query_iface_init (gpointer g_iface, gpointer iface_data);
@@ -71,6 +72,7 @@ G_DEFINE_TYPE_WITH_CODE (SwServiceFlickr, sw_service_flickr, SW_TYPE_SERVICE,
 
 struct _SwServiceFlickrPrivate {
   RestProxy *proxy;
+  RestProxy *upload_proxy;
   FlickrAuthManager *auth_manager; /* Helper class to handle authorization process */
   gboolean inited; /* For GInitable */
   gboolean configured; /* Set if we have user tokens */
@@ -242,6 +244,11 @@ sw_service_flickr_dispose (GObject *object)
     g_object_unref (priv->proxy);
     priv->proxy = NULL;
   }
+  
+  if (priv->upload_proxy) {
+    g_object_unref (priv->upload_proxy);
+    priv->upload_proxy = NULL;
+  }
 
   G_OBJECT_CLASS (sw_service_flickr_parent_class)->dispose (object);
 }
@@ -321,7 +328,7 @@ _flickr_query_open_view (SwQueryIface          *self,
   SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
   SwItemView *item_view;
   const gchar *object_path;
-
+  
   if (!_check_query_validity (query, valid_queries))
   {
     dbus_g_method_return_error (context,
@@ -403,20 +410,84 @@ query_iface_init (gpointer g_iface,
                                       _flickr_query_open_view);
 }
 
+static void
+_create_upload_proxy (SwServiceFlickr *self) {
+  
+  gchar *consumer_key;
+  gchar *consumer_secret;
+  gchar *token;
+  gchar *token_secret;
+  const gboolean NO_BINDING = FALSE;
+    
+  g_object_get (self->priv->proxy,
+                "consumer-key", &consumer_key,
+                "consumer-secret", &consumer_secret,
+                "token", &token,
+                "token-secret", &token_secret,
+                NULL);
+    
+  self->priv->upload_proxy = oauth_proxy_new_with_token (consumer_key,
+                                                         consumer_secret,
+                                                         token,
+                                                         token_secret,
+                                                         FLICKR_UPLOAD_URL,
+                                                         NO_BINDING);
+    
+  g_free (consumer_key);
+  g_free (consumer_secret);
+  g_free (token);
+  g_free (token_secret);
+  
+}
+
 static RestProxyCall *
 _create_upload_call (SwServiceFlickr *self,
                      const gchar *filename,
                      GError **error) {
   
-  /* TODO: implement replacement for flickr_proxy_new_upload_for_file */
-  if (error) {
-    *error = g_error_new (SW_SERVICE_ERROR,
-                          SW_SERVICE_ERROR_NOT_SUPPORTED,
-                          "With deep regret we have to inform you that the upload feature isn't implemented yet."
-                          );
+  g_return_val_if_fail (filename, NULL);
+  
+  RestProxyCall *call = NULL;
+  GMappedFile *map;
+  GError *err = NULL;
+  char *basename = NULL, *content_type = NULL;
+  RestParam *param;
+  
+  /* Open the file */
+  map = g_mapped_file_new (filename, FALSE, &err);
+  if (err) {
+    g_propagate_error (error, err);
+    return NULL;
   }
 
-  return NULL;
+  /* Get the file information */
+  basename = g_path_get_basename (filename);
+  content_type = g_content_type_guess (filename,
+                                       (const guchar*) g_mapped_file_get_contents (map),
+                                       g_mapped_file_get_length (map),
+                                       NULL);
+
+  /* Make the call */
+  
+  if (!self->priv->upload_proxy) {
+    _create_upload_proxy (self);
+  }
+
+  call = rest_proxy_new_call (self->priv->upload_proxy);
+  
+  param = rest_param_new_with_owner ("photo",
+                                     g_mapped_file_get_contents (map),
+                                     g_mapped_file_get_length (map),
+                                     content_type,
+                                     basename,
+                                     map,
+                                     (GDestroyNotify)g_mapped_file_unref);
+  rest_proxy_call_add_param_full (call, param);
+
+  g_free (basename);
+  g_free (content_type);
+
+  return call;  
 
 }
 
@@ -572,10 +643,11 @@ sw_service_flickr_class_init (SwServiceFlickrClass *klass)
 static void
 sw_service_flickr_init (SwServiceFlickr *self)
 {
-  self->priv = GET_PRIVATE (self);
-  self->priv->inited = FALSE;
-  self->priv->configured = FALSE;
-  self->priv->authorised = FALSE;
-  self->priv->auth_manager = NULL;
-  self->priv->proxy = NULL;
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
+  priv->inited = FALSE;
+  priv->configured = FALSE;
+  priv->authorised = FALSE;
+  priv->auth_manager = NULL;
+  priv->proxy = NULL;
+  priv->upload_proxy = NULL;
 }
