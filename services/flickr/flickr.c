@@ -474,6 +474,8 @@ _create_upload_call (SwServiceFlickr *self,
   }
 
   call = rest_proxy_new_call (self->priv->upload_proxy);
+
+	rest_proxy_call_set_method (call, "POST"); /* <-- Flickr requires POST method for uploads */
   
   param = rest_param_new_with_owner ("photo",
                                      g_mapped_file_get_contents (map),
