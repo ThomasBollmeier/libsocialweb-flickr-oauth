@@ -30,13 +30,6 @@ typedef void (*FlickrCheckProxyCallback) (gboolean proxy_valid,
 					  const GError * validation_error,
 					  OAuthProxy * proxy,
 					  gpointer user_data);
-typedef void (*FlickrCheckTokenCallback) (gboolean token_valid,
-					  const GError * validation_error,
-					  const gchar * consumer_key,
-					  const gchar * consumer_secret,
-					  const gchar * token,
-					  const gchar * token_secret,
-					  gpointer user_data);
 typedef gchar *(*FlickrAuthorizeCallback) (const gchar * authorize_url,
 					   gpointer user_data);
 typedef void (*FlickrAccessGrantedCallback) (const gchar * consumer_key,
@@ -69,15 +62,6 @@ void
 flickr_auth_mgr_check_proxy_async (FlickrAuthManager * self,
 				   OAuthProxy * proxy,
 				   FlickrCheckProxyCallback callback,
-				   gpointer user_data, GError ** error);
-
-void
-flickr_auth_mgr_check_token_async (FlickrAuthManager * self,
-				   const gchar * consumer_key,
-				   const gchar * consumer_secret,
-				   const gchar * token,
-				   const gchar * token_secret,
-				   FlickrCheckTokenCallback callback,
 				   gpointer user_data, GError ** error);
 
 void
