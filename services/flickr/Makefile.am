@@ -1,8 +1,11 @@
 services_LTLIBRARIES = libflickr.la
 libflickr_la_SOURCES = module.c \
 		       flickr.c flickr.h \
-		       flickr-auth-manager.c flickr-auth-manager.h \
-		       flickr-auth-error.h \
+		       flickr-credentials.c flickr-credentials.h \
+		       flickr-credentials-error.h \
+		       flickr-credentials-manager.c flickr-credentials-manager.h \
+		       flickr-credentials-manager-goa.c flickr-credentials-manager-goa.h \
+		       flickr-credentials-marshaller.c flickr-credentials-marshaller.h \
 		       flickr-item-view.c flickr-item-view.h \
 		       flickr-contact-view.c flickr-contact-view.h
 libflickr_la_CFLAGS = -I$(top_srcdir) \

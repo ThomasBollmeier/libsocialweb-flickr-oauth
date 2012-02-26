@@ -30,8 +30,6 @@
 #include <libsocialweb/sw-online.h>
 #include <libsocialweb/sw-utils.h>
 #include <libsocialweb/sw-web.h>
-#include <libsocialweb-keystore/sw-keystore.h>
-#include <libsocialweb-keyfob/sw-keyfob.h>
 #include <libsocialweb/sw-client-monitor.h>
 
 #include <rest/oauth-proxy.h>
@@ -44,7 +42,13 @@
 #include "flickr-item-view.h"
 #include "flickr-contact-view.h"
 #include "flickr.h"
-#include "flickr-auth-manager.h"
+
+#define ENABLE_FLICKR_GOA /* TODO: add AC_ARG_ENABLE... to configure.ac */
+#ifdef ENABLE_FLICKR_GOA
+  #include "flickr-credentials-manager-goa.h"
+#else
+  #include "flickr-credentials-manager.h"
+#endif
 
 #define FLICKR_REST_API_URL "http://api.flickr.com/services/rest/"
 #define FLICKR_UPLOAD_URL "http://api.flickr.com/services/upload/"
@@ -73,7 +77,7 @@ G_DEFINE_TYPE_WITH_CODE (SwServiceFlickr, sw_service_flickr, SW_TYPE_SERVICE,
 struct _SwServiceFlickrPrivate {
   RestProxy *proxy;
   RestProxy *upload_proxy;
-  FlickrAuthManager *auth_manager; /* Helper class to handle authorization process */
+  FlickrCredentials *credentials; /* Helper class to manage credentials */
   gboolean inited; /* For GInitable */
   gboolean configured; /* Set if we have user tokens */
   gboolean authorised; /* Set if the tokens are valid */
@@ -142,69 +146,22 @@ get_dynamic_caps (SwService *service)
 }
 
 static void
-on_proxy_checked (gboolean token_valid,
-                  const GError *validation_error,
-                  OAuthProxy *proxy,
-                  gpointer user_data)
-{
-
-  SwServiceFlickr *self = SW_SERVICE_FLICKR (user_data);
-  
-  self->priv->authorised = token_valid;
-
-  if (token_valid) {
-    SW_DEBUG (FLICKR, "checkToken: authorised");
-  } else {
-    SW_DEBUG (FLICKR, "checkToken: invalid token");
-  }
-
-  sw_service_emit_capabilities_changed (SW_SERVICE (self),
-                                        get_dynamic_caps (SW_SERVICE (self)));
-  
-}
-
-static void
-got_tokens_cb (RestProxy *proxy,
-               gboolean   got_tokens,
-               gpointer   user_data)
-{
-  SwService *service = SW_SERVICE (user_data);
-  SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
-  
-  SW_DEBUG (FLICKR, "Got tokens: %s", got_tokens ? "yes" : "no");
-
-  priv->configured = got_tokens;
-  sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
-
-  if (got_tokens && sw_is_online ()) {
-    
-    flickr_auth_mgr_check_proxy_async (priv->auth_manager,
-                                       OAUTH_PROXY (proxy),
-                                       on_proxy_checked,
-                                       user_data,
-                                       NULL /* TODO: error handling */
-                                       );
-
-  }
-
-  /* Drop reference we took for callback */
-  g_object_unref (service);
-}
-
-static void
 credentials_updated (SwService *service)
 {
   SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
 
-  priv->configured = FALSE;
-  priv->authorised = FALSE;
+  if (priv->configured || priv->authorised) {
 
-  sw_keyfob_oauth (OAUTH_PROXY (priv->proxy),
-                   got_tokens_cb,
-                   g_object_ref (service)); /* ref gets dropped in cb */
+    priv->configured = FALSE;
+    priv->authorised = FALSE;
 
-  sw_service_emit_user_changed (service);
-  sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
+    sw_service_emit_user_changed (service);
+    sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
+
+  }
+
+  flickr_credentials_load (priv->credentials); /* emits signal "credentials-available" */
+
 }
 
 static void
@@ -216,12 +173,20 @@ online_notify (gboolean online, gpointer user_data)
   SW_DEBUG (FLICKR, "Online: %s", online ? "yes" : "no");
 
   if (online) {
-    got_tokens_cb (priv->proxy, TRUE, g_object_ref (service));
-  } else {
-    priv->authorised = FALSE;
 
+    if (priv->configured) {
+      flickr_credentials_load (priv->credentials);
+    } else {
+      flickr_credentials_check (priv->credentials, NULL); /* TODO: error handling */
+    }
+
+  } else {
+
+    priv->authorised = FALSE;
     sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
+
   }
+
 }
 
 static const char *
@@ -234,10 +199,10 @@ static void
 sw_service_flickr_dispose (GObject *object)
 {
   SwServiceFlickrPrivate *priv = SW_SERVICE_FLICKR (object)->priv;
-  
-  if (priv->auth_manager) {
-    g_object_unref (priv->auth_manager);
-    priv->auth_manager = NULL;
+
+  if (priv->credentials) {
+    g_object_unref (priv->credentials);
+    priv->credentials = NULL;
   }
 
   if (priv->proxy) {
@@ -253,36 +218,127 @@ sw_service_flickr_dispose (GObject *object)
   G_OBJECT_CLASS (sw_service_flickr_parent_class)->dispose (object);
 }
 
+static void
+_on_credentials_available (
+  FlickrCredentials *credentials, 
+  gboolean available, 
+  gpointer user_data) 
+{
+
+  SwServiceFlickr *self = SW_SERVICE_FLICKR (user_data);
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
+
+  SW_DEBUG (FLICKR, "Got tokens: %s", available ? "yes" : "no");
+
+  if (priv->configured != available) {
+
+    priv->configured = available;
+
+    sw_service_emit_user_changed (SW_SERVICE (self));
+    sw_service_emit_capabilities_changed (SW_SERVICE (self), get_dynamic_caps (SW_SERVICE (self)));
+
+  }
+
+  if (priv->configured && sw_is_online ()) {
+
+    priv->authorised = FALSE;
+  
+    if (priv->proxy) {
+      g_object_unref (priv->proxy);
+      priv->proxy = NULL;
+    }
+
+    if (priv->upload_proxy) {
+      g_object_unref (priv->upload_proxy);
+      priv->upload_proxy = NULL;
+    }
+
+    flickr_credentials_check (priv->credentials, NULL); /* emits signal "credentials-checked" */
+    /* TODO: error handling */
+
+  }
+  
+}
+
+static void
+_on_credentials_checked (
+  FlickrCredentials *credentials, 
+  gboolean credentials_ok, 
+  gpointer error,
+  gpointer user_data) 
+{
+
+  SwServiceFlickr *self = SW_SERVICE_FLICKR (user_data);
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
+
+  priv->authorised = credentials_ok;
+
+  if (credentials_ok) {
+
+    SW_DEBUG (FLICKR, "checkToken: authorised");
+
+    priv->proxy = oauth_proxy_new_with_token (
+      flickr_credentials_get_consumer_key (priv->credentials),
+      flickr_credentials_get_consumer_secret (priv->credentials),
+      flickr_credentials_get_token (priv->credentials),
+      flickr_credentials_get_token_secret (priv->credentials),
+      FLICKR_REST_API_URL,
+      FALSE /* no binding required */
+      );
+
+    priv->upload_proxy = oauth_proxy_new_with_token (
+      flickr_credentials_get_consumer_key (priv->credentials),
+      flickr_credentials_get_consumer_secret (priv->credentials),
+      flickr_credentials_get_token (priv->credentials),
+      flickr_credentials_get_token_secret (priv->credentials),
+      FLICKR_UPLOAD_URL,
+      FALSE /* no binding required */
+      );
+
+  } else {
+
+    SW_DEBUG (FLICKR, "checkToken: invalid token");
+
+  }
+
+  sw_service_emit_capabilities_changed (SW_SERVICE (self), get_dynamic_caps (SW_SERVICE (self)));
+  
+}
+
 static gboolean
 sw_service_flickr_initable (GInitable    *initable,
                             GCancellable *cancellable,
                             GError      **error)
 {
-  SwServiceFlickr *flickr = SW_SERVICE_FLICKR (initable);
-  SwServiceFlickrPrivate *priv = flickr->priv;
-  const char *key = NULL, *secret = NULL;
-  const gboolean NO_BINDING = FALSE;
+  SwServiceFlickr *self = SW_SERVICE_FLICKR (initable);
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
 
   if (priv->inited)
     return TRUE;
 
-  sw_keystore_get_key_secret ("flickr", &key, &secret);
-  if (key == NULL || secret == NULL) {
-    g_set_error_literal (error,
-                         SW_SERVICE_ERROR,
-                         SW_SERVICE_ERROR_NO_KEYS,
-                         "No API key configured");
-    return FALSE;
-  }
-  
-  priv->auth_manager = flickr_auth_mgr_new ();
-  priv->proxy = oauth_proxy_new (key, secret, FLICKR_REST_API_URL, NO_BINDING);
+#ifdef ENABLE_FLICKR_GOA
+  priv->credentials = FLICKR_CREDENTIALS (flickr_credentials_mgr_goa_new ());
+#else
+  priv->credentials = FLICKR_CREDENTIALS (flickr_credentials_mgr_new ());
+#endif  
+  g_signal_connect (
+    priv->credentials,
+    "credentials-available",
+    G_CALLBACK (_on_credentials_available),
+    self
+    );
+  g_signal_connect (
+    priv->credentials,
+    "credentials-checked",
+    G_CALLBACK (_on_credentials_checked),
+    self
+    );
 
-  sw_online_add_notify (online_notify, flickr);
+  sw_online_add_notify (online_notify, self);
 
   priv->inited = TRUE;
 
-  credentials_updated (SW_SERVICE (flickr));
+  credentials_updated (SW_SERVICE (self));
 
   return TRUE;
 }
@@ -410,36 +466,6 @@ query_iface_init (gpointer g_iface,
                                       _flickr_query_open_view);
 }
 
-static void
-_create_upload_proxy (SwServiceFlickr *self) {
-  
-  gchar *consumer_key;
-  gchar *consumer_secret;
-  gchar *token;
-  gchar *token_secret;
-  const gboolean NO_BINDING = FALSE;
-    
-  g_object_get (self->priv->proxy,
-                "consumer-key", &consumer_key,
-                "consumer-secret", &consumer_secret,
-                "token", &token,
-                "token-secret", &token_secret,
-                NULL);
-    
-  self->priv->upload_proxy = oauth_proxy_new_with_token (consumer_key,
-                                                         consumer_secret,
-                                                         token,
-                                                         token_secret,
-                                                         FLICKR_UPLOAD_URL,
-                                                         NO_BINDING);
-    
-  g_free (consumer_key);
-  g_free (consumer_secret);
-  g_free (token);
-  g_free (token_secret);
-  
-}
-
 static RestProxyCall *
 _create_upload_call (SwServiceFlickr *self,
                      const gchar *filename,
@@ -469,10 +495,6 @@ _create_upload_call (SwServiceFlickr *self,
 
   /* Make the call */
   
-  if (!self->priv->upload_proxy) {
-    _create_upload_proxy (self);
-  }
-
   call = rest_proxy_new_call (self->priv->upload_proxy);
   rest_proxy_call_set_method (call, "POST"); /* <-- Flickr requires POST method for uploads */
   
@@ -644,11 +666,14 @@ sw_service_flickr_class_init (SwServiceFlickrClass *klass)
 static void
 sw_service_flickr_init (SwServiceFlickr *self)
 {
+  
   SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
+  
   priv->inited = FALSE;
   priv->configured = FALSE;
   priv->authorised = FALSE;
-  priv->auth_manager = NULL;
+  priv->credentials = NULL;
   priv->proxy = NULL;
   priv->upload_proxy = NULL;
+
 }

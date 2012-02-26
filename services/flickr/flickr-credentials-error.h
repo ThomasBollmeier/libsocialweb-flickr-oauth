@@ -19,19 +19,24 @@
  * Inc., 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef FLICKR_AUTH_ERROR_H
-#define FLICKR_AUTH_ERROR_H
+#ifndef FLICKR_CREDENTIALS_ERROR_H
+#define FLICKR_CREDENTIALS_ERROR_H
 
 #include "glib-object.h"
 
 G_BEGIN_DECLS
-#define FLICKR_AUTH_ERROR g_quark_from_static_string("flickr_auth_error_quark")
-  enum FlickrAuthError
-{
 
-  FLICKR_AUTH_ERROR_INVALID_URL_FORMAT = 1,
-  FLICKR_AUTH_ERROR_FLICKR_ERROR
+#define FLICKR_CREDENTIALS_ERROR g_quark_from_static_string("flickr_credentials_error_quark")
+
+enum FlickrCredentialsError {
+    
+    FLICKR_CREDENTIALS_ERROR_FAILURE = 1,
+    FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
+    FLICKR_CREDENTIALS_ERROR_NOT_AUTHORIZED
+    
 };
 
 G_END_DECLS
+
 #endif
+
