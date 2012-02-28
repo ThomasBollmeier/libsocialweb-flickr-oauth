@@ -24,11 +24,13 @@
 /* UserCode source_top { */
 
 #include <gio/gio.h>
+#include "flickr-credentials-error.h"
 
 /* } UserCode */
 
 struct _FlickrCredentialsManagerGOAPriv {
     GDBusConnection* connection;
+    gchar* object_path;
     gchar* consumer_key;
     gchar* consumer_secret;
     gchar* token;
@@ -77,14 +79,17 @@ static void
 flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self);
 
 static void
-flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, const gchar* object_path, 
-    GVariant* interfaces, GError** error);
+flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, GVariant* interfaces, 
+    GError** error);
 
 static void
 flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* result, gpointer user_data);
 
 static void
 flickr_credentials_mgr_goa_on_access_token(GObject* proxy, GAsyncResult* result, gpointer user_data);
+
+static void
+flickr_credentials_mgr_goa_on_ensure_credentials(GObject* proxy, GAsyncResult* result, gpointer user_data);
 
 void
 flickr_credentials_mgr_goa_init(FlickrCredentialsManagerGOA* self);
@@ -182,6 +187,7 @@ flickr_credentials_mgr_goa_instance_init(
     /* UserCode instance_init { */
     
     self->priv->connection = NULL;
+    self->priv->object_path = NULL;
 
     self->priv->consumer_key = NULL;
     self->priv->consumer_secret = NULL;
@@ -348,7 +354,73 @@ static void
 flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error) {
 /* UserCode Credentials_check { */
 
-    /* TODO: implement... */
+    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (obj);
+    GDBusProxy *proxy = NULL;
+    gboolean credentials_ok = FALSE;
+    gboolean called = FALSE;
+    GError* err = NULL;
+    
+    if (!self->priv->object_path) {
+
+        err = g_error_new(
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_FAILURE,
+            "Account could not be found"
+            );
+
+        goto exit;
+    }
+
+    if (!self->priv->consumer_key ||
+        !self->priv->consumer_secret ||
+        !self->priv->token ||
+        !self->priv->token_secret ) {
+
+        err = g_error_new (
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
+            "Flickr credentials could not be found"
+            );
+
+        goto exit;
+    }
+
+    proxy = flickr_credentials_mgr_goa_create_proxy_sync(
+        self,
+        "org.gnome.OnlineAccounts",
+        self->priv->object_path, 
+        "org.gnome.OnlineAccounts.Account"
+        );
+
+    if (proxy) {
+
+        g_dbus_proxy_call (
+            proxy,
+            "EnsureCredentials",
+            NULL, /* GVariant *parameters */
+            G_DBUS_CALL_FLAGS_NONE, /*GDBusCallFlags flags */
+            -1, /* gint timeout_msec */
+            NULL, /* GCancellable *cancellable */
+            (GAsyncReadyCallback) flickr_credentials_mgr_goa_on_ensure_credentials,
+            self
+            );
+
+        called = TRUE;
+
+    }
+
+    exit:
+
+    if (!called) {
+        g_signal_emit_by_name (self, "credentials_checked", credentials_ok, err);
+        if (proxy) {
+            g_object_unref (proxy);
+        }
+    }
+
+    if (err) {
+        g_propagate_error (error, err);
+    }
 
 /* } UserCode */
 }
@@ -415,6 +487,11 @@ flickr_credentials_mgr_goa_init_dbus(FlickrCredentialsManagerGOA* self) {
 static void
 flickr_credentials_mgr_goa_clear(FlickrCredentialsManagerGOA* self) {
 /* UserCode clear { */
+
+    if (self->priv->object_path) {
+        g_free (self->priv->object_path);
+        self->priv->object_path = NULL;
+    }
 
     if (self->priv->consumer_key) {
         g_free (self->priv->consumer_key);
@@ -495,8 +572,8 @@ flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self) {
 }
 
 static void
-flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, const gchar* object_path, 
-    GVariant* interfaces, GError** error) {
+flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, GVariant* interfaces, 
+    GError** error) {
 /* UserCode get_access_data { */
 
     GVariant *oauth = NULL;
@@ -520,7 +597,7 @@ flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, co
     proxy = flickr_credentials_mgr_goa_create_proxy_sync (
         self,
         "org.gnome.OnlineAccounts",
-        object_path,
+        self->priv->object_path,
         "org.gnome.OnlineAccounts.OAuthBased"
         );
 
@@ -612,7 +689,7 @@ flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* 
 
         if (account) {
               
-            /* Is account an flickr account? */
+            /* Is account a flickr account? */
             provider_type = g_variant_lookup_value (account, "ProviderType", NULL);
 
             if (provider_type) {
@@ -620,15 +697,14 @@ flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* 
                 if (g_strcmp0 (g_variant_get_string (provider_type, NULL), "flickr") == 0) {
 
                     object_path = g_variant_get_child_value (child, 0);
+                    self->priv->object_path = g_strdup (g_variant_get_string (object_path, NULL));
+                    g_variant_unref (object_path);
                 
                     flickr_credentials_mgr_goa_get_access_data (
                         self, 
-                        g_variant_get_string (object_path, NULL),
                         interfaces, 
                         &error
                         );
-
-                    g_variant_unref (object_path);
                 
                     if (error) {
                         error_occurred = TRUE;
@@ -714,6 +790,48 @@ flickr_credentials_mgr_goa_on_access_token(GObject* proxy, GAsyncResult* result,
 /* } UserCode */
 }
 
+static void
+flickr_credentials_mgr_goa_on_ensure_credentials(GObject* proxy, GAsyncResult* result, gpointer user_data) {
+/* UserCode on_ensure_credentials { */
+
+    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (user_data);
+    GVariant *attentionNeeded = NULL;
+    gboolean credentials_ok = FALSE;
+    GError* error = NULL;
+
+    attentionNeeded = g_dbus_proxy_get_cached_property ((GDBusProxy *)proxy, "AttentionNeeded");
+
+    if (attentionNeeded != NULL && g_variant_get_boolean (attentionNeeded) == FALSE) {
+        credentials_ok = TRUE;
+    } else {
+        error = g_error_new(
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_NOT_AUTHORIZED,
+            "Flickr authorization failed"
+            );
+    }
+
+    g_signal_emit_by_name (
+        self, 
+        "credentials-checked", 
+        credentials_ok, 
+        error
+        );
+
+    if (attentionNeeded) {
+        g_variant_unref (attentionNeeded);
+    }
+
+    if (error) {
+        g_error_free (error);
+    }
+
+    g_object_unref (proxy);
+
+/* } UserCode */
+}
+
 /* UserCode source_bottom { */
 
 /* } UserCode */
+

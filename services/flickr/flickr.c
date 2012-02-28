@@ -43,8 +43,7 @@
 #include "flickr-contact-view.h"
 #include "flickr.h"
 
-#define ENABLE_FLICKR_GOA /* TODO: add AC_ARG_ENABLE... to configure.ac */
-#ifdef ENABLE_FLICKR_GOA
+#ifdef FLICKR_WITH_GOA
   #include "flickr-credentials-manager-goa.h"
 #else
   #include "flickr-credentials-manager.h"
