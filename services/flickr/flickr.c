@@ -315,7 +315,7 @@ sw_service_flickr_initable (GInitable    *initable,
   if (priv->inited)
     return TRUE;
 
-#ifdef ENABLE_FLICKR_GOA
+#ifdef FLICKR_WITH_GOA
   priv->credentials = FLICKR_CREDENTIALS (flickr_credentials_mgr_goa_new ());
 #else
   priv->credentials = FLICKR_CREDENTIALS (flickr_credentials_mgr_new ());
