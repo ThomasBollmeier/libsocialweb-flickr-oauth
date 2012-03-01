@@ -41,11 +41,13 @@ struct _FlickrCredentialsManagerGOAPriv {
 
 /* Credentials->load */
 static void
-flickr_credentials_mgr_goa_load_im(FlickrCredentials* obj);
+flickr_credentials_mgr_goa_load_im(FlickrCredentials* obj, FlickrCredentialsLoadCallback callback, 
+    gpointer user_data);
 
 /* Credentials->check */
 static void
-flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error);
+flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, FlickrCredentialsCheckCallback callback, 
+    gpointer user_data);
 
 /* Credentials->get_consumer_key */
 static const gchar*
@@ -76,11 +78,11 @@ flickr_credentials_mgr_goa_create_proxy_sync(FlickrCredentialsManagerGOA* self, 
     const gchar* object_path, const gchar* interface_name);
 
 static void
-flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self);
+flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self, FlickrCredentialsLoadClosure* closure);
 
 static void
 flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, GVariant* interfaces, 
-    GError** error);
+    FlickrCredentialsLoadClosure* closure, GError** error);
 
 static void
 flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* result, gpointer user_data);
@@ -339,30 +341,38 @@ flickr_credentials_mgr_goa_get_property(
 /* ===== interface methods (implementation) ===== */
 
 static void
-flickr_credentials_mgr_goa_load_im(FlickrCredentials* obj) {
+flickr_credentials_mgr_goa_load_im(FlickrCredentials* obj, FlickrCredentialsLoadCallback callback, 
+    gpointer user_data) {
 /* UserCode Credentials_load { */
 
     FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (obj);
+    FlickrCredentialsLoadClosure *closure;
+
+    closure = flickr_credentials_load_closure_new (
+        FLICKR_CREDENTIALS (self),
+        callback,
+        user_data
+        );
 
     flickr_credentials_mgr_goa_clear (self);
-    flickr_credentials_mgr_goa_find_account (self);    
+    flickr_credentials_mgr_goa_find_account (self, closure); /* <-- frees closure */   
 
 /* } UserCode */
 }
 
 static void
-flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error) {
+flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, FlickrCredentialsCheckCallback callback, 
+    gpointer user_data) {
 /* UserCode Credentials_check { */
 
     FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (obj);
     GDBusProxy *proxy = NULL;
-    gboolean credentials_ok = FALSE;
     gboolean called = FALSE;
-    GError* err = NULL;
+    GError* error = NULL;
     
     if (!self->priv->object_path) {
 
-        err = g_error_new(
+        error = g_error_new(
             FLICKR_CREDENTIALS_ERROR,
             FLICKR_CREDENTIALS_ERROR_FAILURE,
             "Account could not be found"
@@ -376,7 +386,7 @@ flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error) {
         !self->priv->token ||
         !self->priv->token_secret ) {
 
-        err = g_error_new (
+        error = g_error_new (
             FLICKR_CREDENTIALS_ERROR,
             FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
             "Flickr credentials could not be found"
@@ -394,6 +404,14 @@ flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error) {
 
     if (proxy) {
 
+        FlickrCredentialsCheckClosure *closure;
+
+        closure = flickr_credentials_check_closure_new (
+            FLICKR_CREDENTIALS (self),
+            callback,
+            user_data
+            );
+
         g_dbus_proxy_call (
             proxy,
             "EnsureCredentials",
@@ -402,7 +420,7 @@ flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error) {
             -1, /* gint timeout_msec */
             NULL, /* GCancellable *cancellable */
             (GAsyncReadyCallback) flickr_credentials_mgr_goa_on_ensure_credentials,
-            self
+            closure
             );
 
         called = TRUE;
@@ -412,14 +430,17 @@ flickr_credentials_mgr_goa_check_im(FlickrCredentials* obj, GError** error) {
     exit:
 
     if (!called) {
-        g_signal_emit_by_name (self, "credentials_checked", credentials_ok, err);
+
+        callback (FLICKR_CREDENTIALS (self), FALSE, error, user_data);
+        
         if (proxy) {
             g_object_unref (proxy);
         }
+
     }
 
-    if (err) {
-        g_propagate_error (error, err);
+    if (error) {
+        g_error_free (error);
     }
 
 /* } UserCode */
@@ -537,7 +558,7 @@ flickr_credentials_mgr_goa_create_proxy_sync(FlickrCredentialsManagerGOA* self, 
 }
 
 static void
-flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self) {
+flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self, FlickrCredentialsLoadClosure* closure) {
 /* UserCode find_account { */
 
     GDBusProxy* mgr_proxy = NULL;
@@ -563,8 +584,12 @@ flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self) {
             -1, /* gint timeout_msec */
             NULL, /* GCancellable *cancellable */
             (GAsyncReadyCallback) flickr_credentials_mgr_goa_on_managed_objects,
-            self
+            closure
             );
+
+    } else {
+
+        closure->callback (closure->credentials, FALSE, NULL, closure->user_data);
 
     }
 
@@ -573,7 +598,7 @@ flickr_credentials_mgr_goa_find_account(FlickrCredentialsManagerGOA* self) {
 
 static void
 flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, GVariant* interfaces, 
-    GError** error) {
+    FlickrCredentialsLoadClosure* closure, GError** error) {
 /* UserCode get_access_data { */
 
     GVariant *oauth = NULL;
@@ -611,7 +636,7 @@ flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, GV
             -1, /* gint timeout_msec */
             NULL, /* GCancellable *cancellable */
             (GAsyncReadyCallback) flickr_credentials_mgr_goa_on_access_token,
-            self
+            closure
             );
 
         called = TRUE;
@@ -620,8 +645,14 @@ flickr_credentials_mgr_goa_get_access_data(FlickrCredentialsManagerGOA* self, GV
 
     exit:
 
-    if (!called) {
-        g_signal_emit_by_name (self, "credentials-available", FALSE);
+    if (error && !called) {
+
+        *error = g_error_new (
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_FAILURE,
+            G_STRLOC ": access token cannot be read"
+            );
+        
     }
 
     if (proxy && !called) {
@@ -647,8 +678,10 @@ static void
 flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* result, gpointer user_data) {
 /* UserCode on_managed_objects { */
 
-    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (user_data);
+    FlickrCredentialsLoadClosure *closure = (FlickrCredentialsLoadClosure *) user_data;
+    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (closure->credentials);
     gboolean error_occurred = FALSE;
+    GError *error = NULL;
 
     if (!result) {
         error_occurred = TRUE;
@@ -672,8 +705,7 @@ flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* 
     GVariant *account;
     GVariant *provider_type;
     gboolean done = FALSE;
-    GError *error = NULL;
-    
+        
     g_variant_iter_init (&iter, content);
 
     while ((child = g_variant_iter_next_value(&iter))) {
@@ -702,15 +734,12 @@ flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* 
                 
                     flickr_credentials_mgr_goa_get_access_data (
                         self, 
-                        interfaces, 
+                        interfaces,
+                        closure,
                         &error
                         );
                 
-                    if (error) {
-                        error_occurred = TRUE;
-                        g_error_free (error);
-                    }
-                
+                    error_occurred = error ? TRUE : FALSE;
                     done = TRUE;
 
                 }
@@ -737,7 +766,12 @@ flickr_credentials_mgr_goa_on_managed_objects(GObject* mgr_proxy, GAsyncResult* 
     g_object_unref (mgr_proxy);
 
     if (error_occurred) {
-        g_signal_emit_by_name (self, "credentials-available", FALSE);
+        closure->callback (closure->credentials, FALSE, error, closure->user_data);
+        flickr_credentials_load_closure_free (closure);
+    }
+
+    if (error) {
+        g_error_free (error);
     }
 
 /* } UserCode */
@@ -747,7 +781,8 @@ static void
 flickr_credentials_mgr_goa_on_access_token(GObject* proxy, GAsyncResult* result, gpointer user_data) {
 /* UserCode on_access_token { */
 
-    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (user_data);
+    FlickrCredentialsLoadClosure *closure = (FlickrCredentialsLoadClosure *) user_data;
+    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (closure->credentials);
     GVariant *data = g_dbus_proxy_call_finish ((GDBusProxy *) proxy, result, NULL);
     GVariant *token = NULL;
     GVariant *token_secret = NULL;
@@ -785,7 +820,9 @@ flickr_credentials_mgr_goa_on_access_token(GObject* proxy, GAsyncResult* result,
 
     g_object_unref (proxy);
 
-    g_signal_emit_by_name (self, "credentials-available", credentials_available);
+    closure->callback (closure->credentials, credentials_available, NULL, closure->user_data);
+
+    flickr_credentials_load_closure_free (closure);
 
 /* } UserCode */
 }
@@ -794,7 +831,7 @@ static void
 flickr_credentials_mgr_goa_on_ensure_credentials(GObject* proxy, GAsyncResult* result, gpointer user_data) {
 /* UserCode on_ensure_credentials { */
 
-    FlickrCredentialsManagerGOA *self = FLICKR_CREDENTIALS_MANAGER_GOA (user_data);
+    FlickrCredentialsCheckClosure *closure = (FlickrCredentialsCheckClosure *) user_data;
     GVariant *attentionNeeded = NULL;
     gboolean credentials_ok = FALSE;
     GError* error = NULL;
@@ -811,12 +848,7 @@ flickr_credentials_mgr_goa_on_ensure_credentials(GObject* proxy, GAsyncResult* r
             );
     }
 
-    g_signal_emit_by_name (
-        self, 
-        "credentials-checked", 
-        credentials_ok, 
-        error
-        );
+    closure->callback (closure->credentials, credentials_ok, error, closure->user_data);
 
     if (attentionNeeded) {
         g_variant_unref (attentionNeeded);
@@ -827,6 +859,8 @@ flickr_credentials_mgr_goa_on_ensure_credentials(GObject* proxy, GAsyncResult* r
     }
 
     g_object_unref (proxy);
+
+    flickr_credentials_check_closure_free (closure);
 
 /* } UserCode */
 }

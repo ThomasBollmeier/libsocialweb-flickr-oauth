@@ -145,125 +145,10 @@ get_dynamic_caps (SwService *service)
 }
 
 static void
-credentials_updated (SwService *service)
-{
-  SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
-
-  if (priv->configured || priv->authorised) {
-
-    priv->configured = FALSE;
-    priv->authorised = FALSE;
-
-    sw_service_emit_user_changed (service);
-    sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
-
-  }
-
-  flickr_credentials_load (priv->credentials); /* emits signal "credentials-available" */
-
-}
-
-static void
-online_notify (gboolean online, gpointer user_data)
-{
-  SwService *service = SW_SERVICE (user_data);
-  SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
-
-  SW_DEBUG (FLICKR, "Online: %s", online ? "yes" : "no");
-
-  if (online) {
-
-    if (priv->configured) {
-      flickr_credentials_load (priv->credentials);
-    } else {
-      flickr_credentials_check (priv->credentials, NULL); /* TODO: error handling */
-    }
-
-  } else {
-
-    priv->authorised = FALSE;
-    sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
-
-  }
-
-}
-
-static const char *
-sw_service_flickr_get_name (SwService *service)
-{
-  return "flickr";
-}
-
-static void
-sw_service_flickr_dispose (GObject *object)
-{
-  SwServiceFlickrPrivate *priv = SW_SERVICE_FLICKR (object)->priv;
-
-  if (priv->credentials) {
-    g_object_unref (priv->credentials);
-    priv->credentials = NULL;
-  }
-
-  if (priv->proxy) {
-    g_object_unref (priv->proxy);
-    priv->proxy = NULL;
-  }
-  
-  if (priv->upload_proxy) {
-    g_object_unref (priv->upload_proxy);
-    priv->upload_proxy = NULL;
-  }
-
-  G_OBJECT_CLASS (sw_service_flickr_parent_class)->dispose (object);
-}
-
-static void
-_on_credentials_available (
-  FlickrCredentials *credentials, 
-  gboolean available, 
-  gpointer user_data) 
-{
-
-  SwServiceFlickr *self = SW_SERVICE_FLICKR (user_data);
-  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
-
-  SW_DEBUG (FLICKR, "Got tokens: %s", available ? "yes" : "no");
-
-  if (priv->configured != available) {
-
-    priv->configured = available;
-
-    sw_service_emit_user_changed (SW_SERVICE (self));
-    sw_service_emit_capabilities_changed (SW_SERVICE (self), get_dynamic_caps (SW_SERVICE (self)));
-
-  }
-
-  if (priv->configured && sw_is_online ()) {
-
-    priv->authorised = FALSE;
-  
-    if (priv->proxy) {
-      g_object_unref (priv->proxy);
-      priv->proxy = NULL;
-    }
-
-    if (priv->upload_proxy) {
-      g_object_unref (priv->upload_proxy);
-      priv->upload_proxy = NULL;
-    }
-
-    flickr_credentials_check (priv->credentials, NULL); /* emits signal "credentials-checked" */
-    /* TODO: error handling */
-
-  }
-  
-}
-
-static void
 _on_credentials_checked (
   FlickrCredentials *credentials, 
   gboolean credentials_ok, 
-  gpointer error,
+  const GError *error,
   gpointer user_data) 
 {
 
@@ -304,6 +189,121 @@ _on_credentials_checked (
   
 }
 
+static void
+_on_credentials_available (
+  FlickrCredentials *credentials, 
+  gboolean available, 
+  const GError *error,
+  gpointer user_data) 
+{
+
+  SwServiceFlickr *self = SW_SERVICE_FLICKR (user_data);
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (self);
+
+  SW_DEBUG (FLICKR, "Got tokens: %s", available ? "yes" : "no");
+
+  if (priv->configured != available) {
+
+    priv->configured = available;
+
+    sw_service_emit_user_changed (SW_SERVICE (self));
+    sw_service_emit_capabilities_changed (SW_SERVICE (self), get_dynamic_caps (SW_SERVICE (self)));
+
+  }
+
+  if (priv->configured && sw_is_online ()) {
+
+    priv->authorised = FALSE;
+  
+    if (priv->proxy) {
+      g_object_unref (priv->proxy);
+      priv->proxy = NULL;
+    }
+
+    if (priv->upload_proxy) {
+      g_object_unref (priv->upload_proxy);
+      priv->upload_proxy = NULL;
+    }
+
+    flickr_credentials_check (priv->credentials, _on_credentials_checked, self); 
+
+  }
+  
+}
+
+static void
+credentials_updated (SwService *service)
+{
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
+
+  if (priv->configured || priv->authorised) {
+
+    priv->configured = FALSE;
+    priv->authorised = FALSE;
+
+    sw_service_emit_user_changed (service);
+    sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
+
+  }
+
+  flickr_credentials_load (priv->credentials, _on_credentials_available, service);
+
+}
+
+static void
+online_notify (gboolean online, gpointer user_data)
+{
+  SwService *service = SW_SERVICE (user_data);
+  SwServiceFlickrPrivate *priv = GET_PRIVATE (service);
+
+  SW_DEBUG (FLICKR, "Online: %s", online ? "yes" : "no");
+
+  if (online) {
+
+    if (priv->configured) {
+      flickr_credentials_load (priv->credentials, _on_credentials_available, service);
+    } else {
+      flickr_credentials_check (priv->credentials, _on_credentials_checked, service);
+    }
+
+  } else {
+
+    priv->authorised = FALSE;
+    sw_service_emit_capabilities_changed (service, get_dynamic_caps (service));
+
+  }
+
+}
+
+static const char *
+sw_service_flickr_get_name (SwService *service)
+{
+  return "flickr";
+}
+
+static void
+sw_service_flickr_dispose (GObject *object)
+{
+  SwServiceFlickrPrivate *priv = SW_SERVICE_FLICKR (object)->priv;
+
+  if (priv->credentials) {
+    g_object_unref (priv->credentials);
+    priv->credentials = NULL;
+  }
+
+  if (priv->proxy) {
+    g_object_unref (priv->proxy);
+    priv->proxy = NULL;
+  }
+  
+  if (priv->upload_proxy) {
+    g_object_unref (priv->upload_proxy);
+    priv->upload_proxy = NULL;
+  }
+
+  G_OBJECT_CLASS (sw_service_flickr_parent_class)->dispose (object);
+}
+
 static gboolean
 sw_service_flickr_initable (GInitable    *initable,
                             GCancellable *cancellable,
@@ -320,18 +320,6 @@ sw_service_flickr_initable (GInitable    *initable,
 #else
   priv->credentials = FLICKR_CREDENTIALS (flickr_credentials_mgr_new ());
 #endif  
-  g_signal_connect (
-    priv->credentials,
-    "credentials-available",
-    G_CALLBACK (_on_credentials_available),
-    self
-    );
-  g_signal_connect (
-    priv->credentials,
-    "credentials-checked",
-    G_CALLBACK (_on_credentials_checked),
-    self
-    );
 
   sw_online_add_notify (online_notify, self);
 

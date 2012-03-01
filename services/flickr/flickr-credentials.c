@@ -23,20 +23,49 @@
 
 /* UserCode source_top { */
 
-#include "flickr-credentials-marshaller.h"
-/* add further includes... */
+FlickrCredentialsLoadClosure *
+flickr_credentials_load_closure_new (
+    FlickrCredentials *credentials,
+    FlickrCredentialsLoadCallback callback, 
+    gpointer user_data) {
+    
+    FlickrCredentialsLoadClosure *res = g_new0(FlickrCredentialsLoadClosure, 1);
+
+    res->credentials = credentials;
+    res->callback = callback;
+    res->user_data = user_data;
+
+    return res;
+
+}
+
+void
+flickr_credentials_load_closure_free (FlickrCredentialsLoadClosure *closure) {
+    g_free (closure);
+}
+
+FlickrCredentialsCheckClosure *
+flickr_credentials_check_closure_new (
+    FlickrCredentials *credentials,
+    FlickrCredentialsLoadCallback callback, 
+    gpointer user_data) {
+
+    FlickrCredentialsCheckClosure *res = g_new0(FlickrCredentialsCheckClosure, 1);
+
+    res->credentials = credentials;
+    res->callback = callback;
+    res->user_data = user_data;
+
+    return res;
+
+}
+
+void
+flickr_credentials_check_closure_free (FlickrCredentialsCheckClosure *closure) {
+    g_free (closure);
+}
 
 /* } UserCode */
-
-/* ===== signals ===== */
-
-enum {
-    CREDENTIALS_AVAILABLE,
-    CREDENTIALS_CHECKED,
-    LAST_SIGNAL
-};
-
-static guint flickr_credentials_signals[LAST_SIGNAL] = {0};
 
 /* ===== initialization & finalization ===== */
 
@@ -47,41 +76,6 @@ flickr_credentials_base_init(FlickrCredentialsIface* iface) {
     
     if (initialized)
         return;
-    
-    /* add signals */
-    
-    /* UserCode signal_credentials_available { */
-    
-    flickr_credentials_signals[CREDENTIALS_AVAILABLE] = g_signal_new("credentials-available",
-        FLICKR_TYPE_CREDENTIALS,
-        G_SIGNAL_RUN_LAST|G_SIGNAL_DETAILED,
-        G_STRUCT_OFFSET(FlickrCredentialsIface, credentials_available),
-        NULL, /* accumulator */
-        NULL,
-        flickr_credentials_VOID__BOOLEAN,
-        G_TYPE_NONE,
-        1,
-        G_TYPE_BOOLEAN
-        );
-    
-    /* } UserCode */
-    
-    /* UserCode signal_credentials_checked { */
-    
-    flickr_credentials_signals[CREDENTIALS_CHECKED] = g_signal_new("credentials-checked",
-        FLICKR_TYPE_CREDENTIALS,
-        G_SIGNAL_RUN_LAST|G_SIGNAL_DETAILED,
-        G_STRUCT_OFFSET(FlickrCredentialsIface, credentials_checked),
-        NULL, /* accumulator */
-        NULL,
-        flickr_credentials_VOID__BOOLEAN_POINTER,
-        G_TYPE_NONE,
-        2,
-        G_TYPE_BOOLEAN,
-        G_TYPE_POINTER
-        );
-    
-    /* } UserCode */
     
     /* UserCode interface_init { */
     
@@ -148,11 +142,12 @@ flickr_credentials_get_type() {
  * @self: a #FlickrCredentials instance
  */
 void
-flickr_credentials_load(FlickrCredentials* self) {
+flickr_credentials_load(FlickrCredentials* self, FlickrCredentialsLoadCallback callback, 
+    gpointer user_data) {
     
     FlickrCredentialsIface* iface = FLICKR_CREDENTIALS_GET_INTERFACE(self);
     
-    iface->load(self);
+    iface->load(self, callback, user_data);
     
 }
 
@@ -162,11 +157,12 @@ flickr_credentials_load(FlickrCredentials* self) {
  * @self: a #FlickrCredentials instance
  */
 void
-flickr_credentials_check(FlickrCredentials* self, GError** error) {
+flickr_credentials_check(FlickrCredentials* self, FlickrCredentialsCheckCallback callback, 
+    gpointer user_data) {
     
     FlickrCredentialsIface* iface = FLICKR_CREDENTIALS_GET_INTERFACE(self);
     
-    iface->check(self, error);
+    iface->check(self, callback, user_data);
     
 }
 

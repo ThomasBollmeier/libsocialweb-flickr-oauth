@@ -5,7 +5,6 @@ libflickr_la_SOURCES = module.c \
 		       flickr-credentials-error.h \
 		       flickr-credentials-manager.c flickr-credentials-manager.h \
 		       flickr-credentials-manager-goa.c flickr-credentials-manager-goa.h \
-		       flickr-credentials-marshaller.c flickr-credentials-marshaller.h \
 		       flickr-item-view.c flickr-item-view.h \
 		       flickr-contact-view.c flickr-contact-view.h
 libflickr_la_CFLAGS = -I$(top_srcdir) \

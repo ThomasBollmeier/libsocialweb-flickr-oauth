@@ -49,11 +49,13 @@ struct _FlickrCredentialsManagerPriv {
 
 /* Credentials->load */
 static void
-flickr_credentials_mgr_load_im(FlickrCredentials* obj);
+flickr_credentials_mgr_load_im(FlickrCredentials* obj, FlickrCredentialsLoadCallback callback, 
+    gpointer user_data);
 
 /* Credentials->check */
 static void
-flickr_credentials_mgr_check_im(FlickrCredentials* obj, GError** error);
+flickr_credentials_mgr_check_im(FlickrCredentials* obj, FlickrCredentialsCheckCallback callback, 
+    gpointer user_data);
 
 /* Credentials->get_consumer_key */
 static const gchar*
@@ -75,13 +77,13 @@ flickr_credentials_mgr_get_token_secret_im(FlickrCredentials* obj);
 
 static void
 flickr_credentials_mgr_on_credentials_checked(RestProxyCall* call, const GError* error, GObject* manager, 
-    gpointer user_data);
+    gpointer closure);
 
 static gboolean
 flickr_credentials_mgr_credentials_ok(RestProxyCall* call, GError** error);
 
 static void
-flickr_credentials_mgr_on_token_looked_up(RestProxy* proxy, gboolean found, gpointer manager);
+flickr_credentials_mgr_on_token_looked_up(RestProxy* proxy, gboolean found, gpointer closure);
 
 void
 flickr_credentials_mgr_init(FlickrCredentialsManager* self);
@@ -328,7 +330,8 @@ flickr_credentials_mgr_get_property(
 /* ===== interface methods (implementation) ===== */
 
 static void
-flickr_credentials_mgr_load_im(FlickrCredentials* obj) {
+flickr_credentials_mgr_load_im(FlickrCredentials* obj, FlickrCredentialsLoadCallback callback, 
+    gpointer user_data) {
 /* UserCode Credentials_load { */
 
     FlickrCredentialsManager *self = FLICKR_CREDENTIALS_MANAGER (obj);
@@ -355,15 +358,29 @@ flickr_credentials_mgr_load_im(FlickrCredentials* obj) {
             FALSE /* <-- no binding */
             );
 
+        FlickrCredentialsLoadClosure *closure = flickr_credentials_load_closure_new (
+            FLICKR_CREDENTIALS (self),
+            callback,
+            user_data
+            );
+
         sw_keyfob_oauth (
             OAUTH_PROXY (proxy),
             flickr_credentials_mgr_on_token_looked_up,
-            self
+            closure
             );
         
     } else {
         
-        g_signal_emit_by_name (self, "credentials-available", FALSE);
+        GError *error = g_error_new(
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
+            G_STRLOC ": no consumer key has been provided"
+            );
+
+        callback (FLICKR_CREDENTIALS (self), FALSE, error, user_data);
+
+        g_error_free (error);
 
     }
 
@@ -371,29 +388,32 @@ flickr_credentials_mgr_load_im(FlickrCredentials* obj) {
 }
 
 static void
-flickr_credentials_mgr_check_im(FlickrCredentials* obj, GError** error) {
+flickr_credentials_mgr_check_im(FlickrCredentials* obj, FlickrCredentialsCheckCallback callback, 
+    gpointer user_data) {
 /* UserCode Credentials_check { */
 
     FlickrCredentialsManager *self = FLICKR_CREDENTIALS_MANAGER (obj);
     RestProxy *check_proxy = NULL;
     const gboolean NO_BINDING = FALSE;
     RestProxyCall *call = NULL;
-    GError* err = NULL;
+    GError* error = NULL;
 
     if (!self->priv->consumer_key || 
         !self->priv->consumer_secret ||
         !self->priv->token ||
         !self->priv->token_secret) {
 
-        if (error) {
-            *error = g_error_new(
-                FLICKR_CREDENTIALS_ERROR,
-                FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
-                "No credentials have been provided"
-                );
-        }
+        error = g_error_new(
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
+            "No credentials have been provided"
+            );
         
-        return;
+        callback (FLICKR_CREDENTIALS (self), FALSE, error, user_data);
+
+        g_error_free (error);
+
+        return; 
 
     }
 
@@ -414,17 +434,28 @@ flickr_credentials_mgr_check_im(FlickrCredentials* obj, GError** error) {
         NULL
         );
 
+    FlickrCredentialsCheckClosure *closure = 
+        flickr_credentials_check_closure_new (
+            FLICKR_CREDENTIALS (self),
+            callback,
+            user_data
+            );
+
     rest_proxy_call_async(
         call,
         flickr_credentials_mgr_on_credentials_checked,
         G_OBJECT (self),
-        NULL,
-        &err
+        closure,
+        &error
         );
 
-    if (err) {
-        g_propagate_error (error, err);
-        OBJ_UNREF (call)
+    if (error) {
+
+        callback (FLICKR_CREDENTIALS (self), FALSE, error, user_data);
+
+        flickr_credentials_check_closure_free (closure);
+        g_object_unref (call);
+
     }
 
     g_object_unref (check_proxy);
@@ -480,10 +511,10 @@ flickr_credentials_mgr_get_token_secret_im(FlickrCredentials* obj) {
 
 static void
 flickr_credentials_mgr_on_credentials_checked(RestProxyCall* call, const GError* error, GObject* manager, 
-    gpointer user_data) {
+    gpointer closure) {
 /* UserCode on_credentials_checked { */
 
-    FlickrCredentialsManager *self = FLICKR_CREDENTIALS_MANAGER (manager);
+    FlickrCredentialsCheckClosure *data = (FlickrCredentialsCheckClosure *) closure;
     gboolean credentials_ok;
     GError *err = NULL;
 
@@ -491,12 +522,7 @@ flickr_credentials_mgr_on_credentials_checked(RestProxyCall* call, const GError*
 
         credentials_ok = flickr_credentials_mgr_credentials_ok (call, &err);
 
-        g_signal_emit_by_name (
-            self, 
-            "credentials-checked",
-            credentials_ok,
-            err
-            );
+        data->callback (data->credentials, credentials_ok, err, data->user_data);
 
         if (err) {
             g_error_free (err);
@@ -504,15 +530,13 @@ flickr_credentials_mgr_on_credentials_checked(RestProxyCall* call, const GError*
 
     } else {
 
-        g_signal_emit_by_name (
-            self, 
-            "credentials-checked",
-            FALSE,
-            error
-            );
+        data->callback (data->credentials, FALSE, error, data->user_data);
+
     }
 
     g_object_unref (call);
+
+    flickr_credentials_check_closure_free (data);
 
 /* } UserCode */
 }
@@ -596,10 +620,12 @@ flickr_credentials_mgr_credentials_ok(RestProxyCall* call, GError** error) {
 }
 
 static void
-flickr_credentials_mgr_on_token_looked_up(RestProxy* proxy, gboolean found, gpointer manager) {
+flickr_credentials_mgr_on_token_looked_up(RestProxy* proxy, gboolean found, gpointer closure) {
 /* UserCode on_token_looked_up { */
 
-    FlickrCredentialsManager *self = FLICKR_CREDENTIALS_MANAGER (manager);
+    FlickrCredentialsLoadClosure *data = (FlickrCredentialsLoadClosure *)closure;
+    FlickrCredentialsManager *self = FLICKR_CREDENTIALS_MANAGER (data->credentials);
+    GError *error = NULL;
 
     if (found) {
 
@@ -610,9 +636,22 @@ flickr_credentials_mgr_on_token_looked_up(RestProxy* proxy, gboolean found, gpoi
             NULL
             );
 
-    } 
+    } else {
 
-    g_signal_emit_by_name (self, "credentials-available", found);
+        error = g_error_new (
+            FLICKR_CREDENTIALS_ERROR,
+            FLICKR_CREDENTIALS_ERROR_NO_KEYS_PROVIDED,
+            G_STRLOC ": no access token could be found for Flickr service"
+            );
+    }
+
+    data->callback (data->credentials, found, error, data->user_data);
+
+    if (error) {
+        g_error_free (error);
+    }
+
+    flickr_credentials_load_closure_free (data);
 
     g_object_unref (proxy);
 

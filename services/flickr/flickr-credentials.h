@@ -28,7 +28,54 @@ G_BEGIN_DECLS
 
 /* UserCode header_top { */
 
-    /* add further includes... */
+typedef struct _FlickrCredentials FlickrCredentials;
+
+typedef void (*FlickrCredentialsLoadCallback) (
+    FlickrCredentials *credentials, 
+    gboolean credentials_found,
+    const GError *error,
+    gpointer user_data
+    );
+
+typedef void (*FlickrCredentialsCheckCallback) (
+    FlickrCredentials *credentials, 
+    gboolean credentials_ok,
+    const GError *error,
+    gpointer user_data
+    );
+
+typedef struct _FlickrCredentialsLoadClosure {
+    FlickrCredentials *credentials;
+    FlickrCredentialsLoadCallback callback;
+    gpointer user_data;
+} FlickrCredentialsLoadClosure;
+
+typedef struct _FlickrCredentialsCheckClosure {
+    FlickrCredentials *credentials;
+    FlickrCredentialsCheckCallback callback;
+    gpointer user_data;
+} FlickrCredentialsCheckClosure;
+
+
+FlickrCredentialsLoadClosure *
+flickr_credentials_load_closure_new (
+    FlickrCredentials *credentials,
+    FlickrCredentialsLoadCallback callback, 
+    gpointer user_data
+    );
+
+void
+flickr_credentials_load_closure_free (FlickrCredentialsLoadClosure *closure);
+
+FlickrCredentialsCheckClosure *
+flickr_credentials_check_closure_new (
+    FlickrCredentials *credentials,
+    FlickrCredentialsLoadCallback callback, 
+    gpointer user_data
+    );
+
+void
+flickr_credentials_check_closure_free (FlickrCredentialsCheckClosure *closure);
 
 /* } UserCode */
 
@@ -41,9 +88,11 @@ typedef struct _FlickrCredentialsIface {
     /* == methods == */
     
     void
-    (*load)(FlickrCredentials* self);
+    (*load)(FlickrCredentials* self, FlickrCredentialsLoadCallback callback, 
+        gpointer user_data);
     void
-    (*check)(FlickrCredentials* self, GError** error);
+    (*check)(FlickrCredentials* self, FlickrCredentialsCheckCallback callback, 
+        gpointer user_data);
     const gchar*
     (*get_consumer_key)(FlickrCredentials* self);
     const gchar*
@@ -53,14 +102,6 @@ typedef struct _FlickrCredentialsIface {
     const gchar*
     (*get_token_secret)(FlickrCredentials* self);
     
-    /* == signals == */
-    
-    void /* credentials-available */
-    (*credentials_available)(FlickrCredentials* sender, gboolean available);
-    void /* credentials-checked */
-    (*credentials_checked)(FlickrCredentials* sender, gboolean credentials_ok, 
-        gpointer error);
-    
 } FlickrCredentialsIface;
 
 GType
@@ -69,10 +110,12 @@ flickr_credentials_get_type();
 /* ===== methods ===== */
 
 void
-flickr_credentials_load(FlickrCredentials* self);
+flickr_credentials_load(FlickrCredentials* self, FlickrCredentialsLoadCallback callback, 
+    gpointer user_data);
 
 void
-flickr_credentials_check(FlickrCredentials* self, GError** error);
+flickr_credentials_check(FlickrCredentials* self, FlickrCredentialsCheckCallback callback, 
+    gpointer user_data);
 
 const gchar*
 flickr_credentials_get_consumer_key(FlickrCredentials* self);
