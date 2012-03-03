@@ -1,5 +1,24 @@
-#!/usr/bin/python
+#! /usr/bin/env python
+
+# libsocialweb - social data store
+# Copyright (C) 2012 Thomas Bollmeier
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms and conditions of the GNU Lesser General Public License,
+# version 2.1, as published by the Free Software Foundation.
+#
+# This program is distributed in the hope it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for
+# more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+
 from gi.repository import Gio, GLib
+
+import dbus_util
 
 class SocialWeb(object):
 
@@ -8,19 +27,19 @@ class SocialWeb(object):
 
 	def __init__(self):
 
-		self._conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+		pass
 
 	def get_services(self):
 
 		res = []
 
-		object = self.create_object(
+		object = dbus_util.ProxyWrapper(
 			SocialWeb.BUS_NAME,
 			SocialWeb.ROOT_PATH,
 			"org.gnome.libsocialweb"
 			)
 
-		data = object.call_method("GetServices")
+		data = object.GetServices()
 		services = data.get_child_value(0)
 		num_services = services.n_children()
 
@@ -35,7 +54,7 @@ class SocialWeb(object):
 		service_names = self.get_services()
 
 		if name in service_names:
-			return self.create_object(
+			return dbus_util.ProxyWrapper(
 				SocialWeb.BUS_NAME,
 				SocialWeb.ROOT_PATH + "/Service/" + name,
 				"org.gnome.libsocialweb.Service"
@@ -43,54 +62,17 @@ class SocialWeb(object):
 		else:
 			return None
 
-	def create_object(self, bus_name, object_path, interface_name):
-
-		return DBusObject(self._conn, bus_name, object_path, interface_name)
-
-class DBusObject(object):
-
-	def __init__(self, conn, bus_name, object_path, interface_name):
-
-		self.bus_name = bus_name
-		self.object_path = object_path
-		self.interface_name = interface_name
-
-		self._proxy = Gio.DBusProxy.new_sync(
-			conn,
-			Gio.DBusProxyFlags.NONE,
-			None,
-			bus_name,
-			object_path, 
-			interface_name, 
-			None
-			)
-
-	def call_method(self, name, args = None):
-
-		return self._proxy.call_sync(
-			name,
-			args,
-			Gio.DBusCallFlags.NONE,
-			-1, # <-- no timeout
-			None # <-- cancellable object
-			)
-
-	def connect(self, signal, handler, user_data=None):
-
-		self._proxy.connect("g-signal", handler, user_data)
-
 class FlickrClient(object):
 
-	def __init__(self, socialweb, flickr_object):
+	def __init__(self, flickr_object):
 
-		self._socialweb = socialweb
-		self._flickr = flickr_object
+		self.object = flickr_object
 
 	def get_static_caps(self):
 
 		res = []
 
-		caps = self._flickr.call_method("GetStaticCapabilities").get_child_value(0)
+		caps = self.object.GetStaticCapabilities().get_child_value(0)
 		for i in xrange(0, caps.n_children()):
 			cap = caps.get_child_value(i)
 			res.append(cap.get_string())
@@ -101,7 +83,7 @@ class FlickrClient(object):
 
 		res = []
 
-		caps = self._flickr.call_method("GetDynamicCapabilities").get_child_value(0)
+		caps = self.object.GetDynamicCapabilities().get_child_value(0)
 		for i in xrange(0, caps.n_children()):
 			cap = caps.get_child_value(i)
 			res.append(cap.get_string())
@@ -110,69 +92,100 @@ class FlickrClient(object):
 
 	def open_own_items_view(self):
 
-		query = self._socialweb.create_object(
-			self._flickr.bus_name,
-			self._flickr.object_path,
-			"org.gnome.libsocialweb.Query"
+		return self._open_view("own")
+
+	def open_search_results_view(self, search_text):
+
+		return self._open_view(
+			"x-flickr-search", 
+			text = search_text
 			)
 
-		args = GLib.Variant("(sa{ss})", (
-			"own",
-			{}
-			))
+	def _open_view(self, query_name, **parameters):
 
-		data = query.call_method("OpenView", args)
+		obj = self.object.get_interface("org.gnome.libsocialweb.Query")
+		data = obj.OpenView("(sa{ss})", query_name, parameters)
 		if data:
 			view_path = data.get_child_value(0).get_string()
-			view_object = self._socialweb.create_object(
-				self._flickr.bus_name,
+			view_object = dbus_util.ProxyWrapper(
+				self.object.bus_name,
 				view_path,
 				"org.gnome.libsocialweb.ItemView"
 				)
-			return ItemView(view_object)
+			return view_object
 		else:
 			return None
 
-class ItemView(object):
+def on_items_added(object, signal_name, parameters, user_data):
 
-	def __init__(self, view_object):
+	print "Items added:"
+	
+	items = parameters.get_child_value(0)
+	
+	for i in xrange(0, items.n_children()):
+	
+		item = items.get_child_value(i)
+	
+		service = item.get_child_value(0)
+		id = item.get_child_value(1)
+		properties = item.get_child_value(3)
+		photo_url = properties.lookup_value("x-flickr-photo-url", None)
+		
+		print "\tService: " + service.get_string()
+		print "\tId: " + id.get_string()
+		if photo_url:
+			print "\tPhoto-URL: " + photo_url.get_string()
+	
+	#main_loop.quit()
 
-		self._view_object = view_object
+def on_caps_changed(object, signal_name, parameters, user_data):
 
-	def close(self):
+	caps = parameters.get_child_value(0)
 
-		self._view_object.call_method("Close")
+	for i in xrange(0, caps.n_children()):
+		if i == 0:
+			print "Changed capabilities:"		
+		print "\t%s" % caps.get_child_value(i).get_string()
 
-	def _get_object_path(self):
+def cmdline_args_to_string(args):
 
-		return self._view_object.object_path
+	res = ""
+	for arg in args:
+		if res:
+			res += " "
+		res += arg
 
-	object_path = property(_get_object_path)
+	return res
 
 ##### main #####
 
-sw = SocialWeb()
+import sys
 
-service = sw.get_service("flickr")
+main_loop = GLib.MainLoop()
+
+service = SocialWeb().get_service("flickr")
 if not service:
 	print "Flickr service not found"
 	exit(1)
 
-flickr = FlickrClient(sw, service)
+flickr = FlickrClient(service)
+flickr.object.connect("CapabilitiesChanged", on_caps_changed)
+flickr.object.CredentialsUpdated()
 
-print "Static capabilities:"
-for cap in flickr.get_static_caps():
-	print "\t" + cap
-print
+args = sys.argv[1:]
 
-print "Dynamic capabilities:"
-for cap in flickr.get_dynamic_caps():
-	print "\t" + cap
+if args:
+	item_view = flickr.open_search_results_view(cmdline_args_to_string(args))	
+else:
+	item_view = flickr.open_own_items_view()
 
-item_view = flickr.open_own_items_view()
+if not item_view:
+	print "ItemView cannot be opened!"
+	exit(1)
 
-if item_view:
-	print "ItemView: %s" % item_view.object_path
-	item_view.close()
+print "ItemView: %s" % item_view.object_path
 
-#GLib.MainLoop().run()
+item_view.connect("ItemsAdded", on_items_added)
+item_view.Start()
+
+main_loop.run()
