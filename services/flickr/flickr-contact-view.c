@@ -32,11 +32,11 @@
 
 #include <libsocialweb/sw-debug.h>
 #include <libsocialweb/sw-contact.h>
-#include <libsocialweb-keyfob/sw-keyfob.h>
 #include <libsocialweb/sw-cache.h>
 
 #include "flickr-contact-view.h"
 #include "flickr.h"
+#include "flickr-credentials.h"
 
 G_DEFINE_TYPE (SwFlickrContactView, sw_flickr_contact_view, SW_TYPE_CONTACT_VIEW)
 
@@ -46,6 +46,7 @@ G_DEFINE_TYPE (SwFlickrContactView, sw_flickr_contact_view, SW_TYPE_CONTACT_VIEW
 typedef struct _SwFlickrContactViewPrivate SwFlickrContactViewPrivate;
 
 struct _SwFlickrContactViewPrivate {
+  FlickrCredentials *credentials;
   RestProxy *proxy;
   guint timeout_id;
   GHashTable *params;
@@ -55,6 +56,7 @@ struct _SwFlickrContactViewPrivate {
 enum
 {
   PROP_0,
+  PROP_CREDENTIALS,
   PROP_PROXY,
   PROP_PARAMS,
   PROP_QUERY
@@ -78,6 +80,9 @@ sw_flickr_contact_view_get_property (GObject    *object,
   SwFlickrContactViewPrivate *priv = GET_PRIVATE (object);
 
   switch (property_id) {
+    case PROP_CREDENTIALS:
+      g_value_set_object (value, priv->credentials);
+      break;
     case PROP_PROXY:
       g_value_set_object (value, priv->proxy);
       break;
@@ -101,6 +106,9 @@ sw_flickr_contact_view_set_property (GObject      *object,
   SwFlickrContactViewPrivate *priv = GET_PRIVATE (object);
 
   switch (property_id) {
+    case PROP_CREDENTIALS:
+      priv->credentials = g_value_dup_object (value);
+      break;
     case PROP_PROXY:
       priv->proxy = g_value_dup_object (value);
       break;
@@ -120,6 +128,12 @@ sw_flickr_contact_view_dispose (GObject *object)
 {
   SwContactView *contact_view = SW_CONTACT_VIEW (object);
   SwFlickrContactViewPrivate *priv = GET_PRIVATE (object);
+
+  if (priv->credentials) 
+  {
+    g_object_unref (priv->credentials);
+    priv->credentials = NULL;
+  }
 
   if (priv->proxy)
   {
@@ -287,29 +301,72 @@ _make_request (SwFlickrContactView *contact_view)
 }
 
 static void
-_got_tokens_cb (RestProxy *proxy,
-                gboolean   authorised,
-                gpointer   userdata)
+_adapt_proxy (SwFlickrContactView* contact_view) 
 {
+
+  SwFlickrContactViewPrivate *priv = GET_PRIVATE (contact_view);
+
+  const gchar* token_new = flickr_credentials_get_token (priv->credentials);
+  const gchar* token_secret_new = flickr_credentials_get_token_secret (priv->credentials);
+
+  gchar* token_old;
+  gchar* token_secret_old;
+
+  g_object_get (G_OBJECT (priv->proxy),
+    "token", &token_old,
+    "token-secret", &token_secret_old,
+    NULL
+    );
+
+  if ( 
+    g_strcmp0 (token_old, token_new) != 0 || 
+    g_strcmp0 (token_secret_old, token_secret_new) != 0 
+    ) 
+  {
+    g_object_set (G_OBJECT (priv->proxy),
+      "token", &token_new,
+      "token-secret", &token_secret_new,
+      NULL
+      );
+  }
+
+  if (token_old) {
+    g_free (token_old);
+  }
+  if (token_secret_old) {
+    g_free (token_secret_old);
+  }
+
+}
+
+static void
+_on_credentials_loaded (
+  FlickrCredentials *credentials,
+  gboolean found,
+  const GError *error,
+  gpointer userdata
+  )
+{
+
   SwFlickrContactView *contact_view = SW_FLICKR_CONTACT_VIEW (userdata);
 
-  if (authorised) 
-  {
+  if (found) {
+    _adapt_proxy (contact_view);
     _make_request (contact_view);
   }
 
-  /* Drop reference we took for callback */
-  g_object_unref (contact_view);
 }
 
 static void
 _get_status_updates (SwFlickrContactView *contact_view)
 {
-  SwFlickrContactViewPrivate *priv = GET_PRIVATE (contact_view);
 
-  sw_keyfob_oauth (OAUTH_PROXY (priv->proxy),
-                   _got_tokens_cb,
-                   g_object_ref (contact_view)); /* ref gets dropped in cb */
+  flickr_credentials_load (
+    GET_PRIVATE (contact_view)->credentials,
+    _on_credentials_loaded,
+    contact_view
+    );
+
 }
 
 static gboolean
@@ -455,6 +512,13 @@ sw_flickr_contact_view_class_init (SwFlickrContactViewClass *klass)
   contact_view_class->start = flickr_contact_view_start;
   contact_view_class->stop = flickr_contact_view_stop;
   contact_view_class->refresh = flickr_contact_view_refresh;
+
+  pspec = g_param_spec_object ("credentials",
+                               "credentials",
+                               "credentials",
+                               FLICKR_TYPE_CREDENTIALS,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+  g_object_class_install_property (object_class, PROP_CREDENTIALS, pspec);
 
   pspec = g_param_spec_object ("proxy",
                                "proxy",

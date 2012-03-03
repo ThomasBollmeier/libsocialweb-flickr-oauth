@@ -161,22 +161,21 @@ _on_credentials_checked (
 
     SW_DEBUG (FLICKR, "checkToken: authorised");
 
-    priv->proxy = oauth_proxy_new_with_token (
-      flickr_credentials_get_consumer_key (priv->credentials),
-      flickr_credentials_get_consumer_secret (priv->credentials),
-      flickr_credentials_get_token (priv->credentials),
-      flickr_credentials_get_token_secret (priv->credentials),
-      FLICKR_REST_API_URL,
-      FALSE /* no binding required */
+    oauth_proxy_set_token (
+      OAUTH_PROXY (priv->proxy),
+      flickr_credentials_get_token (priv->credentials)
       );
-
-    priv->upload_proxy = oauth_proxy_new_with_token (
-      flickr_credentials_get_consumer_key (priv->credentials),
-      flickr_credentials_get_consumer_secret (priv->credentials),
-      flickr_credentials_get_token (priv->credentials),
-      flickr_credentials_get_token_secret (priv->credentials),
-      FLICKR_UPLOAD_URL,
-      FALSE /* no binding required */
+    oauth_proxy_set_token_secret (
+      OAUTH_PROXY (priv->proxy),
+      flickr_credentials_get_token_secret (priv->credentials)
+      );
+    oauth_proxy_set_token (
+      OAUTH_PROXY (priv->upload_proxy),
+      flickr_credentials_get_token (priv->credentials)
+      );
+    oauth_proxy_set_token_secret (
+      OAUTH_PROXY (priv->upload_proxy),
+      flickr_credentials_get_token_secret (priv->credentials)
       );
 
   } else {
@@ -211,19 +210,35 @@ _on_credentials_available (
 
   }
 
-  if (priv->configured && sw_is_online ()) {
+  if (available) {
 
-    priv->authorised = FALSE;
-  
     if (priv->proxy) {
       g_object_unref (priv->proxy);
-      priv->proxy = NULL;
     }
 
     if (priv->upload_proxy) {
       g_object_unref (priv->upload_proxy);
-      priv->upload_proxy = NULL;
     }
+
+    priv->proxy = oauth_proxy_new (
+      flickr_credentials_get_consumer_key (priv->credentials),
+      flickr_credentials_get_consumer_secret (priv->credentials),
+      FLICKR_REST_API_URL,
+      FALSE /* no binding required */
+      );
+
+    priv->upload_proxy = oauth_proxy_new (
+      flickr_credentials_get_consumer_key (priv->credentials),
+      flickr_credentials_get_consumer_secret (priv->credentials),
+      FLICKR_UPLOAD_URL,
+      FALSE /* no binding required */
+      );
+
+  }
+
+  priv->authorised = FALSE;
+
+  if (priv->configured && sw_is_online ()) {
 
     flickr_credentials_check (priv->credentials, _on_credentials_checked, self); 
 
@@ -383,11 +398,12 @@ _flickr_query_open_view (SwQueryIface          *self,
   }
 
   item_view = g_object_new (SW_TYPE_FLICKR_ITEM_VIEW,
-                            "proxy", priv->proxy,
-                            "service", self,
-                            "query", query,
-                            "params", params,
-                            NULL);
+    "credentials", priv->credentials,
+    "proxy", priv->proxy,
+    "service", self,
+    "query", query,
+    "params", params,
+    NULL);
 
   /* Ensure the object gets disposed when the client goes away */
   sw_client_monitor_add (dbus_g_method_get_sender (context),
@@ -419,11 +435,12 @@ _flickr_contacts_query_open_view (SwContactsQueryIface  *self,
   }
 
   contact_view = g_object_new (SW_TYPE_FLICKR_CONTACT_VIEW,
-                            "proxy", priv->proxy,
-                            "service", self,
-                            "query", query,
-                            "params", params,
-                            NULL);
+    "credentials", priv->credentials,
+    "proxy", priv->proxy,
+    "service", self,
+    "query", query,
+    "params", params,
+    NULL);
 
   /* Ensure the object gets disposed when the client goes away */
   sw_client_monitor_add (dbus_g_method_get_sender (context),
